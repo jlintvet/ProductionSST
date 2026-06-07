@@ -1,19 +1,10 @@
 // src/pages/ResetPassword.jsx
-// Handles the Supabase password-reset callback.
-//
-// Flow:
-//   1. User clicks reset link → lands at /reset-password#access_token=...&type=recovery
-//   2. Supabase client processes the hash immediately on initialization (before React mounts)
-//   3. We check both the URL hash AND onAuthStateChange to cover the race condition
-//      where PASSWORD_RECOVERY fires before our listener is registered.
-
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 
 const TEAL = "#0e7490";
 const DARK = "#0f172a";
 
-// ── Eye icon ──────────────────────────────────────────────────────────────────
 function EyeIcon({ visible }) {
   return visible ? (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
@@ -61,7 +52,6 @@ function PasswordInput({ placeholder, value, onChange, required, autoFocus, styl
 }
 
 export default function ResetPassword() {
-  // "waiting" | "ready" | "expired"
   const [status, setStatus]     = useState("waiting");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm]   = useState("");
@@ -71,21 +61,12 @@ export default function ResetPassword() {
 
   useEffect(() => {
     let cancelled = false;
+    function markReady() { if (!cancelled) setStatus("ready"); }
 
-    function markReady() {
-      if (!cancelled) setStatus("ready");
-    }
-
-    // ── Strategy A: event-based ──────────────────────────────────────────────
-    // Catches the case where the hash is processed AFTER this component mounts.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") markReady();
     });
 
-    // ── Strategy B: check immediately ────────────────────────────────────────
-    // The Supabase client may have already processed the hash (and fired the
-    // event) before React mounted this component. In that case the event is
-    // missed above — so we also check the hash + current session right now.
     const hash = window.location.hash.replace(/^#/, "");
     const hashParams = new URLSearchParams(hash);
     if (hashParams.get("type") === "recovery") {
@@ -94,7 +75,6 @@ export default function ResetPassword() {
       });
     }
 
-    // ── Fallback timeout ─────────────────────────────────────────────────────
     const timeout = setTimeout(() => {
       if (!cancelled) setStatus(s => s === "waiting" ? "expired" : s);
     }, 6000);
@@ -119,7 +99,6 @@ export default function ResetPassword() {
     setDone(true);
   }
 
-  // ── Shared styles ──────────────────────────────────────────────────────────
   const wrap = {
     minHeight: "100vh", display: "flex", alignItems: "center",
     justifyContent: "center", background: "#f0f9ff",
@@ -141,9 +120,69 @@ export default function ResetPassword() {
     fontFamily: "inherit",
   };
 
-  // ── Done ───────────────────────────────────────────────────────────────────
   if (done) return (
     <div style={wrap}>
       <div style={{ ...card, textAlign: "center" }}>
-        <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
-        <h2 style={{ margin: "0 0 8px", color: DARK }}>Passw
+        <div style={{ fontSize: 40, marginBottom: 12 }}>&#x2705;</div>
+        <h2 style={{ margin: "0 0 8px", color: DARK }}>Password updated</h2>
+        <p style={{ color: "#64748b", fontSize: 14, marginBottom: 20 }}>
+          Your password has been changed. Sign in with your new password.
+        </p>
+        <button style={btn} onClick={() => window.location.href = "/"}>Go to sign in</button>
+      </div>
+    </div>
+  );
+
+  if (status === "waiting") return (
+    <div style={wrap}>
+      <div style={{ ...card, textAlign: "center" }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: "50%",
+          border: "3px solid #e0f2fe", borderTopColor: TEAL,
+          animation: "spin 0.7s linear infinite", margin: "0 auto 16px",
+        }}/>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <p style={{ color: "#64748b", fontSize: 14 }}>Verifying reset link...</p>
+      </div>
+    </div>
+  );
+
+  if (status === "expired") return (
+    <div style={wrap}>
+      <div style={{ ...card, textAlign: "center" }}>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>&#x26A0;&#xFE0F;</div>
+        <h2 style={{ margin: "0 0 8px", color: DARK }}>Link expired or invalid</h2>
+        <p style={{ color: "#64748b", fontSize: 14, marginBottom: 20 }}>
+          This password reset link has expired or is no longer valid.
+          Please request a new one from the sign-in page.
+        </p>
+        <button style={btn} onClick={() => window.location.href = "/"}>Back to sign in</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={wrap}>
+      <div style={card}>
+        <h2 style={{ margin: "0 0 4px", color: DARK, textAlign: "center" }}>Set new password</h2>
+        <p style={{ color: "#64748b", fontSize: 14, textAlign: "center", marginBottom: 20 }}>
+          Choose a strong password for your account.
+        </p>
+        <form onSubmit={handleSubmit}>
+          <PasswordInput style={inp} placeholder="New password" value={password}
+            onChange={e => setPassword(e.target.value)} required autoFocus />
+          <PasswordInput style={inp} placeholder="Confirm new password" value={confirm}
+            onChange={e => setConfirm(e.target.value)} required />
+          {error && (
+            <p style={{ color: "#dc2626", fontSize: 13, margin: "0 0 10px", padding: "8px 12px", background: "#fef2f2", borderRadius: 6 }}>
+              {error}
+            </p>
+          )}
+          <button style={btn} type="submit" disabled={loading}>
+            {loading ? "..." : "Set new password"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
