@@ -5,6 +5,53 @@
 import React, { useState } from "react";
 import { supabase } from "@/lib/supabase";
 
+// ── Eye icon ──────────────────────────────────────────────────────────────────
+function EyeIcon({ visible }) {
+  return visible ? (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+  ) : (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+      <line x1="1" y1="1" x2="23" y2="23"/>
+    </svg>
+  );
+}
+
+function PasswordInput({ placeholder, value, onChange, required, autoFocus, style }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div style={{ position: "relative", marginBottom: 12 }}>
+      <input
+        type={show ? "text" : "password"}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        required={required}
+        autoFocus={autoFocus}
+        style={{ ...style, marginBottom: 0, paddingRight: "2.5rem" }}
+      />
+      <button
+        type="button"
+        onClick={() => setShow(s => !s)}
+        style={{
+          position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+          background: "none", border: "none", cursor: "pointer",
+          color: "#94a3b8", padding: 2, display: "flex", alignItems: "center",
+        }}
+        tabIndex={-1}
+        aria-label={show ? "Hide password" : "Show password"}
+      >
+        <EyeIcon visible={show} />
+      </button>
+    </div>
+  );
+}
+
 const TEAL = "#0e7490";
 const DARK = "#0f172a";
 
@@ -173,7 +220,7 @@ function AuthForm() {
       <form onSubmit={mode === "login" ? handleLogin : handleRegister}>
         <input style={inp} type="email" placeholder="Email address" value={email}
           onChange={e => setEmail(e.target.value)} required autoFocus />
-        <input style={inp} type="password" placeholder="Password" value={password}
+        <PasswordInput style={inp} placeholder="Password" value={password}
           onChange={e => setPassword(e.target.value)} required />
         {mode === "login" && (
           <div style={{ textAlign: "right", marginTop: -8, marginBottom: 10 }}>
@@ -183,7 +230,7 @@ function AuthForm() {
           </div>
         )}
         {mode === "register" && (
-          <input style={inp} type="password" placeholder="Confirm password" value={confirm}
+          <PasswordInput style={inp} placeholder="Confirm password" value={confirm}
             onChange={e => setConfirm(e.target.value)} required />
         )}
         {error && (
@@ -284,45 +331,4 @@ export default function MarketingLanding({ onAuthSuccess }) {
         }}>
           <h2 style={{ margin: "0 0 6px", fontSize: 20, color: DARK }}>Get started</h2>
           <p style={{ margin: "0 0 20px", fontSize: 14, color: "#64748b" }}>
-            New accounts get a 14-day free Pro trial.
-          </p>
-          <AuthForm />
-        </div>
-
-        {/* Pricing */}
-        <div style={{ flex: "2 1 500px" }}>
-          <h2 style={{ margin: "0 0 8px", fontSize: 24, color: DARK, fontWeight: 700 }}>Pricing</h2>
-          <p style={{ margin: "0 0 24px", color: "#64748b", fontSize: 15 }}>
-            Simple annual pricing. Cancel anytime.
-          </p>
-          <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
-            <PricingCard name="Base" price={29} features={BASE_FEATURES} />
-            <PricingCard name="Pro" price={69} features={PRO_FEATURES} highlight badge="Most Popular" />
-          </div>
-          <p style={{ margin: "20px 0 0", fontSize: 13, color: "#94a3b8", textAlign: "center" }}>
-            All plans include a 14-day free Pro trial · No credit card required to start
-          </p>
-        </div>
-      </div>
-
-      {/* Feature strip */}
-      <div style={{ background: "#fff", borderTop: "1px solid #e2e8f0", padding: "2.5rem 2rem" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", flexWrap: "wrap", gap: "2rem", justifyContent: "center" }}>
-          {[
-            { icon: "🌊", label: "Live SST data updated daily" },
-            { icon: "🐟", label: "Fishing hotspots (Pro)" },
-            { icon: "🗺️", label: "Chlorophyll, bathy & sea color" },
-            { icon: "💨", label: "Wind & NOAA weather" },
-            { icon: "📍", label: "Save & share locations" },
-            { icon: "🎯", label: "Departure port planning" },
-          ].map(({ icon, label }) => (
-            <div key={label} style={{ textAlign: "center", minWidth: 140 }}>
-              <div style={{ fontSize: 28, marginBottom: 6 }}>{icon}</div>
-              <div style={{ fontSize: 13, color: "#475569", fontWeight: 500 }}>{label}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
+            New accounts get
