@@ -337,11 +337,8 @@ function SSTPageBody() {
   const [showHotspots,   setShowHotspots]   = useState(false);
   const [wreckRemovedKeys, setWreckRemovedKeys] = useState(new Set());
 
-  useEffect(() => {
-    base44.entities.WreckReview.filter({ decision: "remove" }, "-reviewed_date", 5000)
-      .then(records => { setWreckRemovedKeys(new Set(records.map(r => r.wreck_key))); })
-      .catch(() => {});
-  }, []);
+  // WreckReview entity was Base44-only; stubbed out pending Supabase migration
+  useEffect(() => { setWreckRemovedKeys(new Set()); }, []);
 
   useEffect(() => {
     if (activeDataLayer !== "composite" || compositeData) return;
