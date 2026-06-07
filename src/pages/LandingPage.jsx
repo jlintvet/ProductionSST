@@ -31,40 +31,34 @@ const PRO_FEATURES = [
 
 // ── Auth form ─────────────────────────────────────────────────────────────────
 function AuthForm() {
-  const [mode, setMode]         = useState("login");
+  const [mode, setMode]         = useState("login");   // "login" | "register" | "reset"
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm]   = useState("");
+  const [resetEmail, setResetEmail] = useState("");
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState(null);
-  const [sent, setSent]         = useState(false);
-  const [resetSent, setResetSent] = useState(false);
+  const [sent, setSent]         = useState(false);     // register confirm email sent
+  const [resetSent, setResetSent] = useState(false);   // reset email "sent"
 
-  async function handleReset(e) {
-    e.preventDefault(); setError(null);
-    if (!email) { setError("Enter your email address first."); return; }
-    setLoading(true);
-    const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    setLoading(false);
-    if (err) setError(err.message); else setResetSent(true);
-  }
+  // ── Shared styles ─────────────────────────────────────────────────────────
+  const inp = {
+    width: "100%", padding: "0.65rem 0.9rem", border: "1px solid #cbd5e1",
+    borderRadius: 8, fontSize: 15, marginBottom: 12, boxSizing: "border-box",
+    outline: "none", fontFamily: "inherit",
+  };
+  const btn = {
+    width: "100%", padding: "0.75rem", background: TEAL, color: "#fff",
+    border: "none", borderRadius: 8, fontSize: 15, fontWeight: 600,
+    cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1,
+    marginTop: 4, fontFamily: "inherit",
+  };
+  const lnk = {
+    background: "none", border: "none", color: TEAL, cursor: "pointer",
+    fontSize: 14, textDecoration: "underline", padding: 0, fontFamily: "inherit",
+  };
 
-  if (resetSent) return (
-    <div style={{ textAlign: "center", padding: "1rem 0" }}>
-      <div style={{ fontSize: 40, marginBottom: 12 }}>📧</div>
-      <h3 style={{ margin: "0 0 8px", color: DARK }}>Check your email</h3>
-      <p style={{ color: "#64748b", fontSize: 14, margin: "0 0 16px" }}>
-        Password reset link sent to <strong>{email}</strong>.
-      </p>
-      <button style={{ width: "100%", padding: "0.75rem", background: "#64748b", color: "#fff", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer" }}
-        onClick={() => { setResetSent(false); setMode("login"); }}>
-        Back to sign in
-      </button>
-    </div>
-  );
-
+  // ── Handlers ──────────────────────────────────────────────────────────────
   async function handleLogin(e) {
     e.preventDefault(); setError(null); setLoading(true);
     const { error: err } = await supabase.auth.signInWithPassword({ email, password });
@@ -82,22 +76,21 @@ function AuthForm() {
     if (err) setError(err.message); else setSent(true);
   }
 
-  const inp = {
-    width: "100%", padding: "0.65rem 0.9rem", border: "1px solid #cbd5e1",
-    borderRadius: 8, fontSize: 15, marginBottom: 12, boxSizing: "border-box",
-    outline: "none", fontFamily: "inherit",
-  };
-  const btn = {
-    width: "100%", padding: "0.75rem", background: TEAL, color: "#fff",
-    border: "none", borderRadius: 8, fontSize: 15, fontWeight: 600,
-    cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1,
-    marginTop: 4, fontFamily: "inherit",
-  };
-  const lnk = {
-    background: "none", border: "none", color: TEAL, cursor: "pointer",
-    fontSize: 14, textDecoration: "underline", padding: 0, fontFamily: "inherit",
-  };
+  async function handleReset(e) {
+    e.preventDefault(); setError(null);
+    if (!resetEmail.trim()) { setError("Enter your email address."); return; }
+    setLoading(true);
+    // Always show success — never reveal whether the email is registered (prevents enumeration)
+    await supabase.auth.resetPasswordForEmail(resetEmail.trim(), {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setLoading(false);
+    setResetSent(true);
+  }
 
+  // ── Views ─────────────────────────────────────────────────────────────────
+
+  // Register confirmation sent
   if (sent) return (
     <div style={{ textAlign: "center", padding: "1rem 0" }}>
       <div style={{ fontSize: 40, marginBottom: 12 }}>📧</div>
@@ -112,6 +105,49 @@ function AuthForm() {
     </div>
   );
 
+  // Password reset — success state
+  if (resetSent) return (
+    <div style={{ textAlign: "center", padding: "1rem 0" }}>
+      <div style={{ fontSize: 40, marginBottom: 12 }}>📧</div>
+      <h3 style={{ margin: "0 0 8px", color: DARK }}>Check your email</h3>
+      <p style={{ color: "#64748b", fontSize: 14, margin: "0 0 16px" }}>
+        If <strong>{resetEmail}</strong> is a registered account, a password reset link has been sent.
+      </p>
+      <button style={{ ...btn, background: "#64748b" }}
+        onClick={() => { setResetSent(false); setMode("login"); setResetEmail(""); }}>
+        Back to sign in
+      </button>
+    </div>
+  );
+
+  // Password reset — email input
+  if (mode === "reset") return (
+    <div>
+      <h3 style={{ margin: "0 0 6px", fontSize: 18, color: DARK }}>Reset your password</h3>
+      <p style={{ margin: "0 0 18px", fontSize: 14, color: "#64748b" }}>
+        Enter the email address for your account and we'll send a reset link.
+      </p>
+      <form onSubmit={handleReset}>
+        <input style={inp} type="email" placeholder="Email address" value={resetEmail}
+          onChange={e => setResetEmail(e.target.value)} required autoFocus />
+        {error && (
+          <p style={{ color: "#dc2626", fontSize: 13, margin: "0 0 10px", padding: "8px 12px", background: "#fef2f2", borderRadius: 6 }}>
+            {error}
+          </p>
+        )}
+        <button style={btn} type="submit" disabled={loading}>
+          {loading ? "…" : "Send reset link"}
+        </button>
+      </form>
+      <div style={{ textAlign: "center", marginTop: 14 }}>
+        <button type="button" style={lnk} onClick={() => { setMode("login"); setError(null); }}>
+          Back to sign in
+        </button>
+      </div>
+    </div>
+  );
+
+  // Login / Register
   return (
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
@@ -141,7 +177,9 @@ function AuthForm() {
           onChange={e => setPassword(e.target.value)} required />
         {mode === "login" && (
           <div style={{ textAlign: "right", marginTop: -8, marginBottom: 10 }}>
-            <button type="button" style={lnk} onClick={handleReset}>Forgot password?</button>
+            <button type="button" style={lnk} onClick={() => { setMode("reset"); setError(null); }}>
+              Forgot password?
+            </button>
           </div>
         )}
         {mode === "register" && (
@@ -196,7 +234,6 @@ function PricingCard({ name, price, features, highlight, badge }) {
             padding: "6px 0", fontSize: 14,
             color: highlight ? "rgba(255,255,255,0.9)" : "#475569",
             fontWeight: i === 0 && f.includes("Everything") ? 600 : 400,
-            borderTop: i === 0 && f.includes("Everything") ? "none" : undefined,
           }}>
             {!f.includes("Everything") && (
               <span style={{ marginRight: 8, color: highlight ? "#7dd3fc" : TEAL }}>✓</span>
@@ -289,4 +326,3 @@ export default function MarketingLanding({ onAuthSuccess }) {
     </div>
   );
 }
-          
