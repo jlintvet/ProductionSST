@@ -1,11 +1,10 @@
-// src/pages/MarketingLanding.jsx
-// Standalone marketing + auth page. No AppShell import — avoids circular deps.
-// Shows pricing tiers and handles login/signup via Supabase directly.
-
+// src/pages/LandingPage.jsx
 import React, { useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-// ── Eye icon ──────────────────────────────────────────────────────────────────
+const TEAL = "#0e7490";
+const DARK = "#0f172a";
+
 function EyeIcon({ visible }) {
   return visible ? (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
@@ -52,10 +51,6 @@ function PasswordInput({ placeholder, value, onChange, required, autoFocus, styl
   );
 }
 
-const TEAL = "#0e7490";
-const DARK = "#0f172a";
-
-// ── Feature lists ─────────────────────────────────────────────────────────────
 const BASE_FEATURES = [
   "Sea Surface Temperature (SST) maps",
   "Departure port planning — heading & distance",
@@ -76,19 +71,17 @@ const PRO_FEATURES = [
   "Shared locations",
 ];
 
-// ── Auth form ─────────────────────────────────────────────────────────────────
 function AuthForm() {
-  const [mode, setMode]         = useState("login");   // "login" | "register" | "reset"
+  const [mode, setMode]         = useState("login");
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm]   = useState("");
   const [resetEmail, setResetEmail] = useState("");
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState(null);
-  const [sent, setSent]         = useState(false);     // register confirm email sent
-  const [resetSent, setResetSent] = useState(false);   // reset email "sent"
+  const [sent, setSent]         = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
-  // ── Shared styles ─────────────────────────────────────────────────────────
   const inp = {
     width: "100%", padding: "0.65rem 0.9rem", border: "1px solid #cbd5e1",
     borderRadius: 8, fontSize: 15, marginBottom: 12, boxSizing: "border-box",
@@ -105,7 +98,6 @@ function AuthForm() {
     fontSize: 14, textDecoration: "underline", padding: 0, fontFamily: "inherit",
   };
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
   async function handleLogin(e) {
     e.preventDefault(); setError(null); setLoading(true);
     const { error: err } = await supabase.auth.signInWithPassword({ email, password });
@@ -127,20 +119,16 @@ function AuthForm() {
     e.preventDefault(); setError(null);
     if (!resetEmail.trim()) { setError("Enter your email address."); return; }
     setLoading(true);
-    // Always show success — never reveal whether the email is registered (prevents enumeration)
     await supabase.auth.resetPasswordForEmail(resetEmail.trim(), {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: window.location.origin + "/reset-password",
     });
     setLoading(false);
     setResetSent(true);
   }
 
-  // ── Views ─────────────────────────────────────────────────────────────────
-
-  // Register confirmation sent
   if (sent) return (
     <div style={{ textAlign: "center", padding: "1rem 0" }}>
-      <div style={{ fontSize: 40, marginBottom: 12 }}>📧</div>
+      <div style={{ fontSize: 40, marginBottom: 12 }}>&#x1F4E7;</div>
       <h3 style={{ margin: "0 0 8px", color: DARK }}>Check your email</h3>
       <p style={{ color: "#64748b", fontSize: 14, margin: "0 0 16px" }}>
         We sent a confirmation link to <strong>{email}</strong>.<br/>
@@ -152,10 +140,9 @@ function AuthForm() {
     </div>
   );
 
-  // Password reset — success state
   if (resetSent) return (
     <div style={{ textAlign: "center", padding: "1rem 0" }}>
-      <div style={{ fontSize: 40, marginBottom: 12 }}>📧</div>
+      <div style={{ fontSize: 40, marginBottom: 12 }}>&#x1F4E7;</div>
       <h3 style={{ margin: "0 0 8px", color: DARK }}>Check your email</h3>
       <p style={{ color: "#64748b", fontSize: 14, margin: "0 0 16px" }}>
         If <strong>{resetEmail}</strong> is a registered account, a password reset link has been sent.
@@ -167,12 +154,11 @@ function AuthForm() {
     </div>
   );
 
-  // Password reset — email input
   if (mode === "reset") return (
     <div>
       <h3 style={{ margin: "0 0 6px", fontSize: 18, color: DARK }}>Reset your password</h3>
       <p style={{ margin: "0 0 18px", fontSize: 14, color: "#64748b" }}>
-        Enter the email address for your account and we'll send a reset link.
+        Enter the email address for your account and we will send a reset link.
       </p>
       <form onSubmit={handleReset}>
         <input style={inp} type="email" placeholder="Email address" value={resetEmail}
@@ -183,7 +169,7 @@ function AuthForm() {
           </p>
         )}
         <button style={btn} type="submit" disabled={loading}>
-          {loading ? "…" : "Send reset link"}
+          {loading ? "..." : "Send reset link"}
         </button>
       </form>
       <div style={{ textAlign: "center", marginTop: 14 }}>
@@ -194,7 +180,6 @@ function AuthForm() {
     </div>
   );
 
-  // Login / Register
   return (
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
@@ -204,7 +189,7 @@ function AuthForm() {
             cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s",
             background: mode === m ? TEAL : "#f1f5f9",
             color: mode === m ? "#fff" : "#64748b",
-            border: mode === m ? `2px solid ${TEAL}` : "2px solid #e2e8f0",
+            border: mode === m ? "2px solid " + TEAL : "2px solid #e2e8f0",
           }}>
             {m === "login" ? "Sign in" : "Start free trial"}
           </button>
@@ -213,7 +198,7 @@ function AuthForm() {
 
       {mode === "register" && (
         <p style={{ fontSize: 13, color: "#0e7490", background: "#f0f9ff", borderRadius: 8, padding: "8px 12px", margin: "0 0 14px", textAlign: "center" }}>
-          🎣 14-day free Pro trial — no credit card required
+          14-day free Pro trial - no credit card required
         </p>
       )}
 
@@ -239,14 +224,13 @@ function AuthForm() {
           </p>
         )}
         <button style={btn} type="submit" disabled={loading}>
-          {loading ? "…" : mode === "login" ? "Sign in" : "Create account & start trial"}
+          {loading ? "..." : mode === "login" ? "Sign in" : "Create account & start trial"}
         </button>
       </form>
     </div>
   );
 }
 
-// ── Pricing card ──────────────────────────────────────────────────────────────
 function PricingCard({ name, price, features, highlight, badge }) {
   return (
     <div style={{
@@ -283,7 +267,7 @@ function PricingCard({ name, price, features, highlight, badge }) {
             fontWeight: i === 0 && f.includes("Everything") ? 600 : 400,
           }}>
             {!f.includes("Everything") && (
-              <span style={{ marginRight: 8, color: highlight ? "#7dd3fc" : TEAL }}>✓</span>
+              <span style={{ marginRight: 8, color: highlight ? "#7dd3fc" : TEAL }}>&#x2713;</span>
             )}
             {f}
           </li>
@@ -293,37 +277,32 @@ function PricingCard({ name, price, features, highlight, badge }) {
   );
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────────
 export default function MarketingLanding({ onAuthSuccess }) {
   return (
     <div style={{ minHeight: "100vh", background: "#f0f9ff", fontFamily: "'Inter', system-ui, sans-serif" }}>
 
-      {/* Hero */}
       <div style={{
-        background: `linear-gradient(135deg, ${DARK} 0%, #0c4a6e 60%, #0e7490 100%)`,
+        background: "linear-gradient(135deg, " + DARK + " 0%, #0c4a6e 60%, #0e7490 100%)",
         padding: "4rem 2rem 3rem",
         textAlign: "center",
         color: "#fff",
       }}>
         <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: 2, color: "#7dd3fc", marginBottom: 12, textTransform: "uppercase" }}>
-          🎣 OceanPulse SST
+          OceanPulse SST
         </div>
         <h1 style={{ margin: "0 0 16px", fontSize: "clamp(2rem, 5vw, 3.25rem)", fontWeight: 800, lineHeight: 1.15 }}>
           Find Fish.<br/>Not Guesswork.
         </h1>
         <p style={{ margin: "0 auto", maxWidth: 560, fontSize: 18, color: "#bae6fd", lineHeight: 1.6 }}>
-          Real-time sea surface temperature, chlorophyll, bathymetry, and wind data —
+          Real-time sea surface temperature, chlorophyll, bathymetry, and wind data -
           built for offshore anglers who need to know where the bite is before they leave the dock.
         </p>
       </div>
 
-      {/* Main content */}
       <div style={{
         maxWidth: 1100, margin: "0 auto", padding: "3rem 1.5rem",
         display: "flex", flexWrap: "wrap", gap: "3rem", alignItems: "flex-start",
       }}>
-
-        {/* Auth box */}
         <div style={{
           background: "#fff", borderRadius: 16, padding: "2rem",
           boxShadow: "0 4px 24px rgba(0,0,0,0.10)",
@@ -331,4 +310,43 @@ export default function MarketingLanding({ onAuthSuccess }) {
         }}>
           <h2 style={{ margin: "0 0 6px", fontSize: 20, color: DARK }}>Get started</h2>
           <p style={{ margin: "0 0 20px", fontSize: 14, color: "#64748b" }}>
-            New accounts get
+            New accounts get a 14-day free Pro trial.
+          </p>
+          <AuthForm />
+        </div>
+
+        <div style={{ flex: "2 1 500px" }}>
+          <h2 style={{ margin: "0 0 8px", fontSize: 24, color: DARK, fontWeight: 700 }}>Pricing</h2>
+          <p style={{ margin: "0 0 24px", color: "#64748b", fontSize: 15 }}>
+            Simple annual pricing. Cancel anytime.
+          </p>
+          <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+            <PricingCard name="Base" price={29} features={BASE_FEATURES} />
+            <PricingCard name="Pro" price={69} features={PRO_FEATURES} highlight badge="Most Popular" />
+          </div>
+          <p style={{ margin: "20px 0 0", fontSize: 13, color: "#94a3b8", textAlign: "center" }}>
+            All plans include a 14-day free Pro trial. No credit card required to start.
+          </p>
+        </div>
+      </div>
+
+      <div style={{ background: "#fff", borderTop: "1px solid #e2e8f0", padding: "2.5rem 2rem" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", flexWrap: "wrap", gap: "2rem", justifyContent: "center" }}>
+          {[
+            { icon: "&#x1F30A;", label: "Live SST data updated daily" },
+            { icon: "&#x1F41F;", label: "Fishing hotspots (Pro)" },
+            { icon: "&#x1F5FA;&#xFE0F;", label: "Chlorophyll, bathy & sea color" },
+            { icon: "&#x1F4A8;", label: "Wind & NOAA weather" },
+            { icon: "&#x1F4CD;", label: "Save & share locations" },
+            { icon: "&#x1F3AF;", label: "Departure port planning" },
+          ].map(({ icon, label }) => (
+            <div key={label} style={{ textAlign: "center", minWidth: 140 }}>
+              <div style={{ fontSize: 28, marginBottom: 6 }} dangerouslySetInnerHTML={{ __html: icon }} />
+              <div style={{ fontSize: 13, color: "#475569", fontWeight: 500 }}>{label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
