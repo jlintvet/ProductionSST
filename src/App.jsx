@@ -6,7 +6,6 @@ import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import SSTLive from "@/pages/SSTLive";
-import SSTDisplayTest from "@/pages/SSTDisplayTest";
 import LandingPage from "@/pages/LandingPage";
 import SharedLocationLanding from "@/pages/SharedLocationLanding";
 import WreckReviewAdmin from "@/pages/WreckReviewAdmin";
@@ -62,8 +61,7 @@ function AppRoot() {
   return (
     <Router>
       <Routes>
-        <Route path="/display-test" element={<SSTDisplayTest />} />
-        <Route path="/share" element={<SharedLocationLanding />} />
+<Route path="/share" element={<SharedLocationLanding />} />
         <Route path="/wreck-review" element={<WreckReviewAdmin />} />
         <Route path="/*" element={<SSTLive />} />
       </Routes>

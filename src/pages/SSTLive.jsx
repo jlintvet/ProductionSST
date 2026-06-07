@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { base44 } from "@/api/base44Client";
+import { fetchMURSST, fetchVIIRSSST, fetchGOESComposite, fetchChlorophyll, fetchSeaColor } from "@/lib/dataFetchers";
 import { supabase } from "@/lib/supabase";
 import AppShell from "@/components/shell/AppShell";
 import { useAppContext } from "@/context/AppContext";
@@ -405,7 +405,7 @@ function SSTPageBody() {
 
   function applyResult(sourceName, result, setState) { setSourceStatus(s=>({...s,[sourceName]:result.status}));if(result.ok){setState({data:result.data,dateIndex:Math.max(0,(result.data.days?.length??1)-1)});}else{setState({data:result.data,dateIndex:0});} }
 
-  async function fetchMUR(){setLoading(true);setError(null);try{const res=await base44.functions.invoke("sstSummary",{});const result=normalizeSSTResponse(res,"MUR","sst");applyResult("MUR",result,setMurState);}catch(e){console.error("[SST:MUR] fetch failed:",e);setError(e.message);setSourceStatus(s=>({...s,MUR:"error"}));}setLoading(false);}
+  async function fetchMUR(){setLoading(true);setError(null);try{const res=await fetchMURSST();const result=normalizeSSTResponse(res,"MUR","sst");applyResult("MUR",result,setMurState);}catch(e){console.error("[SST:MUR] fetch failed:",e);setError(e.message);setSourceStatus(s=>({...s,MUR:"error"}));}setLoading(false);}
   async function fetchVIIRS() {
     setLoading(true); setError(null);
     try {
@@ -425,8 +425,8 @@ function SSTPageBody() {
     } catch(e) { console.error("[SST:VIIRS] fetch failed:",e); setError(e.message); setSourceStatus(s=>({...s,VIIRS:"error"})); }
     setLoading(false);
   }
-  async function fetchVIIRSNpp(){setLoading(true);setError(null);try{const res=await base44.functions.invoke("getVIIRSSSTData",{});const result=normalizeSSTResponse(res,"VIIRSSNPP","sst");applyResult("VIIRSSNPP",result,setViirsNppState);}catch(e){console.error("[SST:VIIRSSNPP] fetch failed:",e);setError(e.message);setSourceStatus(s=>({...s,VIIRSSNPP:"error"}));}setLoading(false);}
-  async function fetchGOESComposite(){setLoading(true);setError(null);try{const res=await base44.functions.invoke("getGOESCompositeData",{});const result=normalizeSSTResponse(res,"GOESCOMP","sst");applyResult("GOESCOMP",result,setGoesCompState);}catch(e){console.error("[SST:GOESCOMP] fetch failed:",e);setError(e.message);setSourceStatus(s=>({...s,GOESCOMP:"error"}));}setLoading(false);}
+  async function fetchVIIRSNpp(){setLoading(true);setError(null);try{const res=await fetchVIIRSSST();const result=normalizeSSTResponse(res,"VIIRSSNPP","sst");applyResult("VIIRSSNPP",result,setViirsNppState);}catch(e){console.error("[SST:VIIRSSNPP] fetch failed:",e);setError(e.message);setSourceStatus(s=>({...s,VIIRSSNPP:"error"}));}setLoading(false);}
+  async function fetchGOESComp(){setLoading(true);setError(null);try{const res=await fetchGOESComposite();const result=normalizeSSTResponse(res,"GOESCOMP","sst");applyResult("GOESCOMP",result,setGoesCompState);}catch(e){console.error("[SST:GOESCOMP] fetch failed:",e);setError(e.message);setSourceStatus(s=>({...s,GOESCOMP:"error"}));}setLoading(false);}
   useEffect(()=>{if(dataSource==="MUR")fetchMUR();else if(dataSource==="VIIRS")fetchVIIRS();else if(dataSource==="VIIRSSNPP")fetchVIIRSNpp();else if(dataSource==="GOESCOMP")fetchGOESComposite();},[dataSource]);
 
   useEffect(() => {
@@ -443,8 +443,8 @@ function SSTPageBody() {
     })();
   }, [viirsDateIndex, viirsData, dataSource]);
 
-  useEffect(()=>{if(activeDataLayer!=="chlorophyll"||chlData)return;setChlLoading(true);base44.functions.invoke("getChlorophyllData",{}).then(res=>{const result=normalizeSSTResponse(res,"CHL","chlorophyll");if(result.ok){setChlData(result.data);setChlDateIndex(Math.max(0,(result.data.days?.length??1)-1));}else{setChlData(result.data);}setChlLoading(false);}).catch(e=>{console.error("[SST:CHL] fetch failed:",e);setChlLoading(false);});},[activeDataLayer]);
-  useEffect(()=>{if(activeDataLayer!=="seacolor"||seaColorData)return;setSeaColorLoading(true);base44.functions.invoke("getSeaColorData",{}).then(res=>{const result=normalizeSSTResponse(res,"SEACOLOR","kd490");if(result.ok){setSeaColorData(result.data);if(result.data?.days?.length)setSeaColorDateIndex(result.data.days.length-1);}else{setSeaColorData(result.data);}setSeaColorLoading(false);}).catch(e=>{console.error("[SST:SEACOLOR] fetch failed:",e);setSeaColorLoading(false);});},[activeDataLayer]);
+  useEffect(()=>{if(activeDataLayer!=="chlorophyll"||chlData)return;setChlLoading(true);fetchChlorophyll().then(res=>{const result=normalizeSSTResponse(res,"CHL","chlorophyll");if(result.ok){setChlData(result.data);setChlDateIndex(Math.max(0,(result.data.days?.length??1)-1));}else{setChlData(result.data);}setChlLoading(false);}).catch(e=>{console.error("[SST:CHL] fetch failed:",e);setChlLoading(false);});},[activeDataLayer]);
+  useEffect(()=>{if(activeDataLayer!=="seacolor"||seaColorData)return;setSeaColorLoading(true);fetchSeaColor().then(res=>{const result=normalizeSSTResponse(res,"SEACOLOR","kd490");if(result.ok){setSeaColorData(result.data);if(result.data?.days?.length)setSeaColorDateIndex(result.data.days.length-1);}else{setSeaColorData(result.data);}setSeaColorLoading(false);}).catch(e=>{console.error("[SST:SEACOLOR] fetch failed:",e);setSeaColorLoading(false);});},[activeDataLayer]);
 
   const activeViirsDay    = viirsData?.days?.[viirsDateIndex] ?? null;
   const activeViirsGrid   = viirsHour&&activeViirsDay?.hours_cache?.[viirsHour] ? activeViirsDay.hours_cache[viirsHour].grid : activeViirsDay?.grid ?? null;
