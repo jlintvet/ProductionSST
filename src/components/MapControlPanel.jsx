@@ -6,7 +6,7 @@
  *   - Mode        (Pan / Inspect — always visible, never collapses)
  *   - Data layer  (SST [with sub-source picker] | Chlorophyll | Sea color | Wind map)
  *   - Gain        (range control — adapts label/units to active layer, hidden for wind)
- *   - Tools       (Temp break, Fish spots, Wind overlay)
+ *   - Tools       (Temp break, Hot spots, Wind overlay)
  *   - Overlays    (Bathy, Wrecks)
  *   - Departure   (selected location name — bottom context)
  */
@@ -531,7 +531,7 @@ export default function MapControlPanel({
 
           <ProGate isPro={isPro} label="Fishing hotspot scoring is available on the Pro plan.">
             <ToolBtn active={showHotspots} color="amber" onClick={() => setShowHotspots(h => !h)}>
-              🎣 {hotspotLoading ? "Loading…" : "Fish spots"}
+              🎣 {hotspotLoading ? "Loading…" : "Hot spots"}
             </ToolBtn>
             {showHotspots && (
               <div className="flex flex-wrap gap-1 mt-0.5">

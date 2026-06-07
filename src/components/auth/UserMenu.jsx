@@ -25,26 +25,29 @@ export default function UserMenu({ onUpgrade }) {
     .slice(0, 2)
     .toUpperCase();
 
-  // Build tier label from subscription_status values stored in user_profiles
+  // tier values from useRegionAccess: "trial" | "standard" | "pro"
   function getTierLabel() {
-    if (tier === "active")     return "Active subscription";
-    if (tier === "cancelled")  return "Cancelled";
-    if (tier === "free_trial") {
-      if (daysLeft === null)   return "Free trial";
-      if (daysLeft === 0)      return "Trial expired";
-      if (daysLeft === 1)      return "Free trial · 1 day left";
-      return `Free trial · ${daysLeft} days left`;
+    if (tier === "pro")      return "Pro";
+    if (tier === "standard") return "Standard";
+    if (tier === "trial") {
+      if (daysLeft === null) return "Free Trial";
+      if (daysLeft === 0)    return "Trial expired";
+      if (daysLeft === 1)    return "Free Trial (1 day left)";
+      return "Free Trial (" + daysLeft + " days left)";
     }
-    return "—";
+    return tier ?? "—";
   }
 
-  const tierColor = {
-    free_trial: daysLeft === 0 ? "text-red-500" : "text-amber-600",
-    active:     "text-green-600",
-    cancelled:  "text-slate-400",
-  }[tier] ?? "text-slate-500";
+  function getTierColor() {
+    if (tier === "pro")      return "#16a34a"; // green
+    if (tier === "standard") return "#475569"; // slate
+    if (tier === "trial") {
+      return daysLeft === 0 ? "#dc2626" : "#d97706"; // red if expired, amber otherwise
+    }
+    return "#94a3b8";
+  }
 
-  const showUpgrade = (tier === "free_trial" || tier === "cancelled") && onUpgrade;
+  const showUpgrade = (tier === "trial" || tier === "standard") && onUpgrade;
 
   return (
     <div ref={ref} className="relative flex-shrink-0">
@@ -64,7 +67,9 @@ export default function UserMenu({ onUpgrade }) {
         <div className="absolute right-0 top-full mt-1.5 z-50 w-56 bg-white border border-slate-200 rounded-xl shadow-lg py-2 text-xs">
           <div className="px-3 py-2 border-b border-slate-100">
             <p className="text-slate-800 font-medium truncate">{user.email}</p>
-            <p className={`mt-0.5 font-semibold ${tierColor}`}>{getTierLabel()}</p>
+            <p style={{ color: getTierColor() }} className="mt-0.5 font-semibold">
+              {getTierLabel()}
+            </p>
             {permittedRegions.length > 0 && (
               <p className="text-slate-400 mt-0.5">
                 Region: {permittedRegions.join(", ")}
@@ -77,7 +82,7 @@ export default function UserMenu({ onUpgrade }) {
               onClick={() => { setOpen(false); onUpgrade(); }}
               className="w-full text-left px-3 py-2 text-cyan-600 font-semibold hover:bg-cyan-50 transition-colors"
             >
-              Upgrade subscription →
+              Upgrade to Pro →
             </button>
           )}
 

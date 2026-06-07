@@ -1844,7 +1844,7 @@ export default function SSTHeatmapLeaflet(props) {
                     <MobileProGate isPro={isPro} label="Fishing hotspot scoring is available on the Pro plan.">
                       <button onClick={() => setShowHotspots(h => !h)}
                         className={`w-full text-[11px] font-semibold px-3 py-2 rounded-lg border flex items-center gap-1.5 transition-colors ${showHotspots ? "bg-amber-700 text-white border-amber-700" : "bg-white text-slate-600 border-slate-300"}`}>
-                        🎣 {hotspotLoading ? "Loading…" : "Fish spots"}
+                        🎣 {hotspotLoading ? "Loading…" : "Hot spots"}
                       </button>
                       {showHotspots && (
                         <div className="flex flex-wrap gap-1">
