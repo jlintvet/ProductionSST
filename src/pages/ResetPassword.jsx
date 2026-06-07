@@ -1,8 +1,11 @@
 // src/pages/ResetPassword.jsx
 // Handles the Supabase password-reset callback.
-// Supabase sends a link with #access_token=...&type=recovery in the hash.
-// On page load, Supabase processes the hash and fires PASSWORD_RECOVERY.
-// We wait for that event, then show the set-new-password form.
+//
+// Flow:
+//   1. User clicks reset link → lands at /reset-password#access_token=...&type=recovery
+//   2. Supabase client processes the hash immediately on initialization (before React mounts)
+//   3. We check both the URL hash AND onAuthStateChange to cover the race condition
+//      where PASSWORD_RECOVERY fires before our listener is registered.
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
@@ -12,7 +15,7 @@ const DARK = "#0f172a";
 
 export default function ResetPassword() {
   // "waiting" | "ready" | "expired"
-  const [status, setStatus]   = useState("waiting");
+  const [status, setStatus]     = useState("waiting");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm]   = useState("");
   const [loading, setLoading]   = useState(false);
@@ -20,20 +23,39 @@ export default function ResetPassword() {
   const [done, setDone]         = useState(false);
 
   useEffect(() => {
-    // Listen for the PASSWORD_RECOVERY auth event Supabase fires when it
-    // processes the recovery token in the URL hash.
+    let cancelled = false;
+
+    function markReady() {
+      if (!cancelled) setStatus("ready");
+    }
+
+    // ── Strategy A: event-based ──────────────────────────────────────────────
+    // Catches the case where the hash is processed AFTER this component mounts.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
-        setStatus("ready");
-      }
+      if (event === "PASSWORD_RECOVERY") markReady();
     });
 
-    // Fallback: if no event fires within 5 seconds, the link is invalid/expired.
+    // ── Strategy B: check immediately ────────────────────────────────────────
+    // The Supabase client may have already processed the hash (and fired the
+    // event) before React mounted this component. In that case the event is
+    // missed above — so we also check the hash + current session right now.
+    const hash = window.location.hash.replace(/^#/, "");
+    const hashParams = new URLSearchParams(hash);
+    if (hashParams.get("type") === "recovery") {
+      // Hash says recovery — confirm a session exists (token was accepted)
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) markReady();
+        // If no session yet, strategy A will catch the event when it fires
+      });
+    }
+
+    // ── Fallback timeout ─────────────────────────────────────────────────────
     const timeout = setTimeout(() => {
-      setStatus(s => s === "waiting" ? "expired" : s);
-    }, 5000);
+      if (!cancelled) setStatus(s => s === "waiting" ? "expired" : s);
+    }, 6000);
 
     return () => {
+      cancelled = true;
       subscription.unsubscribe();
       clearTimeout(timeout);
     };
@@ -81,7 +103,7 @@ export default function ResetPassword() {
         <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
         <h2 style={{ margin: "0 0 8px", color: DARK }}>Password updated</h2>
         <p style={{ color: "#64748b", fontSize: 14, marginBottom: 20 }}>
-          Your password has been changed. You can now sign in with your new password.
+          Your password has been changed. Sign in with your new password.
         </p>
         <button style={btn} onClick={() => window.location.href = "/"}>
           Go to sign in
@@ -114,38 +136,6 @@ export default function ResetPassword() {
         <h2 style={{ margin: "0 0 8px", color: DARK }}>Link expired or invalid</h2>
         <p style={{ color: "#64748b", fontSize: 14, marginBottom: 20 }}>
           This password reset link has expired or is no longer valid.
-          Please request a new one.
+          Please request a new one from the sign-in page.
         </p>
-        <button style={btn} onClick={() => window.location.href = "/"}>
-          Back to sign in
-        </button>
-      </div>
-    </div>
-  );
-
-  // ── Set new password form ─────────────────────────────────────────────────
-  return (
-    <div style={wrap}>
-      <div style={card}>
-        <h2 style={{ margin: "0 0 4px", color: DARK, textAlign: "center" }}>Set new password</h2>
-        <p style={{ color: "#64748b", fontSize: 14, textAlign: "center", marginBottom: 20 }}>
-          Choose a strong password for your account.
-        </p>
-        <form onSubmit={handleSubmit}>
-          <input style={inp} type="password" placeholder="New password" value={password}
-            onChange={e => setPassword(e.target.value)} required autoFocus />
-          <input style={inp} type="password" placeholder="Confirm new password" value={confirm}
-            onChange={e => setConfirm(e.target.value)} required />
-          {error && (
-            <p style={{ color: "#dc2626", fontSize: 13, margin: "0 0 10px", padding: "8px 12px", background: "#fef2f2", borderRadius: 6 }}>
-              {error}
-            </p>
-          )}
-          <button style={btn} type="submit" disabled={loading}>
-            {loading ? "…" : "Set new password"}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-}
+        <button style={btn} onClick={() => window.location.href = "/"
