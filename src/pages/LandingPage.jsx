@@ -38,6 +38,32 @@ function AuthForm() {
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState(null);
   const [sent, setSent]         = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+
+  async function handleReset(e) {
+    e.preventDefault(); setError(null);
+    if (!email) { setError("Enter your email address first."); return; }
+    setLoading(true);
+    const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setLoading(false);
+    if (err) setError(err.message); else setResetSent(true);
+  }
+
+  if (resetSent) return (
+    <div style={{ textAlign: "center", padding: "1rem 0" }}>
+      <div style={{ fontSize: 40, marginBottom: 12 }}>📧</div>
+      <h3 style={{ margin: "0 0 8px", color: DARK }}>Check your email</h3>
+      <p style={{ color: "#64748b", fontSize: 14, margin: "0 0 16px" }}>
+        Password reset link sent to <strong>{email}</strong>.
+      </p>
+      <button style={{ width: "100%", padding: "0.75rem", background: "#64748b", color: "#fff", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer" }}
+        onClick={() => { setResetSent(false); setMode("login"); }}>
+        Back to sign in
+      </button>
+    </div>
+  );
 
   async function handleLogin(e) {
     e.preventDefault(); setError(null); setLoading(true);
@@ -113,6 +139,11 @@ function AuthForm() {
           onChange={e => setEmail(e.target.value)} required autoFocus />
         <input style={inp} type="password" placeholder="Password" value={password}
           onChange={e => setPassword(e.target.value)} required />
+        {mode === "login" && (
+          <div style={{ textAlign: "right", marginTop: -8, marginBottom: 10 }}>
+            <button type="button" style={lnk} onClick={handleReset}>Forgot password?</button>
+          </div>
+        )}
         {mode === "register" && (
           <input style={inp} type="password" placeholder="Confirm password" value={confirm}
             onChange={e => setConfirm(e.target.value)} required />
@@ -258,3 +289,4 @@ export default function MarketingLanding({ onAuthSuccess }) {
     </div>
   );
 }
+          
