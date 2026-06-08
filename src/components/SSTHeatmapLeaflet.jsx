@@ -1051,14 +1051,16 @@ export default function SSTHeatmapLeaflet(props) {
     if (!hourData?.velocityJSON) return;
     const maxSpd = currentsData.maxSpeed ?? 2.0;
     const currentsLayer = L.velocityLayer({
-      lineWidth: 1.5,
+      lineWidth: 3.5,
+      particleMultiplier: 0.0002,
+      particleAge: 60,
       displayOptions: {
         velocityType: "Current", position: "bottomleft", emptyString: "No current data",
         angleConvention: "bearingCW", showCardinal: false,
         speedUnit: "m/s", directionString: "Direction", speedString: "Speed",
       },
       data: hourData.velocityJSON, minVelocity: 0, maxVelocity: maxSpd,
-      velocityScale: 0.04,   // currents ~10x slower than wind — scale up particle speed
+      velocityScale: 0.04,
       colorScale: ["rgba(255,255,255,0.4)","rgba(255,255,255,0.65)","rgba(255,255,255,0.85)","rgba(255,255,255,0.95)"],
     });
     currentsLayer.addTo(map);
@@ -2280,3 +2282,4 @@ export default function SSTHeatmapLeaflet(props) {
     </div>
   );
 }
+       
