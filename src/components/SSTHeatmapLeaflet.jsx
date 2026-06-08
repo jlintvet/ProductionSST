@@ -450,6 +450,7 @@ export default function SSTHeatmapLeaflet(props) {
   const velocityLayerRef    = useRef(null);
   const windRasterOverlayRef= useRef(null);
   const currentsLayerRef    = useRef(null);
+  const slaContourLayerRef  = useRef(null);
   const blobUrlsRef         = useRef([]);
 
   const selectedLocationRef = useRef(selectedLocation);
@@ -912,7 +913,7 @@ export default function SSTHeatmapLeaflet(props) {
     if (!mapReady || !map || !latSet.length) return;
     const mask = waterMaskRef.current; if (!mask) return;
     if (sstOverlayRef.current) { map.removeLayer(sstOverlayRef.current); sstOverlayRef.current = null; }
-    if (!showSSTLayer || (activeDataLayer !== "sst" && activeDataLayer !== "altimetry")) return;
+    if (!showSSTLayer || activeDataLayer !== "sst") return;
     const rangeMin = sstRange?.min !== undefined ? sstRange.min : undefined;
     const rangeMax = sstRange?.max !== undefined ? sstRange.max : undefined;
     let cancelled = false;
@@ -973,36 +974,24 @@ export default function SSTHeatmapLeaflet(props) {
       overlayGrid={};day.grid.forEach(d=>{overlayGrid[`${d.lat}_${d.lon}`]=d.kd490;});
       min2=day.stats.min;max2=day.stats.max;colorFn=kd490Color;
     } else if (activeDataLayer==="altimetry"&&altimetryData?.lats?.length) {
+      // No raster for altimetry — contour lines are drawn by the SLA contour useEffect.
+      // Update legend range only.
       const { lats, lons, sla } = altimetryData;
       if (!sla) return;
-      const rawLats = lats.map(v => Math.round(v * 1e5) / 1e5);
-      const rawLons = lons.map(v => Math.round(v * 1e5) / 1e5);
-      overlayGrid = {};
-      for (let i = 0; i < rawLats.length; i++) {
-        const row = sla[i]; if (!row) continue;
-        for (let j = 0; j < rawLons.length; j++) {
-          const v = row[j];
-          if (v != null && Number.isFinite(v)) overlayGrid[`${rawLats[i]}_${rawLons[j]}`] = v;
-        }
-      }
-      latSet2 = [...rawLats].sort((a, b) => b - a);
-      lonSet2 = [...rawLons].sort((a, b) => a - b);
-      // Auto-scale: use 5th/95th percentile of actual data, symmetric around 0, capped at ±0.4m
-      const slaVals = Object.values(overlayGrid).filter(v => Number.isFinite(v)).sort((a,b)=>a-b);
-      if (slaVals.length > 10) {
-        const p5  = slaVals[Math.floor(slaVals.length * 0.05)];
-        const p95 = slaVals[Math.floor(slaVals.length * 0.95)];
+      const slaFlat = [];
+      for (let i = 0; i < lats.length; i++) { const row = sla[i]; if (!row) continue; for (let j = 0; j < lons.length; j++) { const v = row[j]; if (v != null && Number.isFinite(v)) slaFlat.push(v); } }
+      slaFlat.sort((a, b) => a - b);
+      if (slaFlat.length > 10) {
+        const p5 = slaFlat[Math.floor(slaFlat.length * 0.05)];
+        const p95 = slaFlat[Math.floor(slaFlat.length * 0.95)];
         const autoRange = Math.min(0.4, Math.max(Math.abs(p5), Math.abs(p95)));
-        min2 = -autoRange; max2 = autoRange;
-      } else {
-        min2 = -0.2; max2 = 0.2;
+        onSlaRange?.({ min: -autoRange, max: autoRange });
       }
-      colorFn = slaColor;
-      onSlaRange?.({ min: min2, max: max2 });
+      return; // Contours drawn separately — no raster overlay
     } else { return; }
     if (!latSet2.length) return;
     let cancelled = false;
-    const useRefGrid = activeDataLayer==="seacolor" || activeDataLayer==="chlorophyll" || activeDataLayer==="altimetry";
+    const useRefGrid = activeDataLayer==="seacolor" || activeDataLayer==="chlorophyll";
     const renderLatSet = useRefGrid ? latSet : latSet2;
     const renderLonSet = useRefGrid ? lonSet : lonSet2;
     const renderGrid   = useRefGrid ? expandCoarseGrid(latSet2,lonSet2,overlayGrid,latSet,lonSet) : overlayGrid;
@@ -1015,8 +1004,7 @@ export default function SSTHeatmapLeaflet(props) {
       if (cancelled || !result) return;
       const { dataURL, west, east, north, south } = result;
       blobUrlsRef.current.push(dataURL);
-      const overlayOpacity = activeDataLayer === "altimetry" ? 0.62 : 0.92;
-      const overlay = L.imageOverlay(dataURL, [[south, west], [north, east]], { opacity: overlayOpacity, interactive: false });
+      const overlay = L.imageOverlay(dataURL, [[south, west], [north, east]], { opacity: 0.92, interactive: false });
       overlay.addTo(map); overlayLayerRef.current = overlay;
     });
     return () => { cancelled = true; };
@@ -1083,6 +1071,67 @@ export default function SSTHeatmapLeaflet(props) {
       if (currentsLayerRef.current) { map.removeLayer(currentsLayerRef.current); currentsLayerRef.current = null; }
     };
   }, [mapReady, showCurrents, currentsData, repaintTrigger]);
+
+  // ── SLA contour lines (altimetry layer) ────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!mapReady || !map) return;
+    if (slaContourLayerRef.current) { map.removeLayer(slaContourLayerRef.current); slaContourLayerRef.current = null; }
+    if (activeDataLayer !== "altimetry" || !altimetryData?.lats?.length) return;
+    const { lats, lons, sla } = altimetryData;
+    if (!sla) return;
+    const rawLats = lats.map(v => Math.round(v * 1e5) / 1e5);
+    const rawLons = lons.map(v => Math.round(v * 1e5) / 1e5);
+    const latSet2 = [...rawLats].sort((a, b) => b - a);
+    const lonSet2 = [...rawLons].sort((a, b) => a - b);
+    const overlayGrid = {};
+    for (let i = 0; i < rawLats.length; i++) {
+      const row = sla[i]; if (!row) continue;
+      for (let j = 0; j < rawLons.length; j++) {
+        const v = row[j];
+        if (v != null && Number.isFinite(v)) overlayGrid[`${rawLats[i]}_${rawLons[j]}`] = v;
+      }
+    }
+    if (!latSet2.length || !lonSet2.length) return;
+    // Compute contour levels at 0.05m intervals across 5th–95th percentile
+    const slaVals = Object.values(overlayGrid).filter(v => Number.isFinite(v)).sort((a,b)=>a-b);
+    if (slaVals.length < 4) return;
+    const p5  = slaVals[Math.floor(slaVals.length * 0.05)];
+    const p95 = slaVals[Math.floor(slaVals.length * 0.95)];
+    const STEP = 0.05;
+    const levelMin = Math.ceil(p5 / STEP) * STEP;
+    const levelMax = Math.floor(p95 / STEP) * STEP;
+    const levels = [];
+    for (let l = levelMin; l <= levelMax + 0.001; l += STEP) levels.push(Math.round(l * 1000) / 1000);
+    // Color + weight per level
+    const levelStyle = (v) => {
+      const a = Math.abs(v);
+      if (a < 0.025) return { color: "#111", weight: 2.5 }; // zero line — dark, bold
+      if (v < -0.2)  return { color: "#0018b0", weight: 2.0 };
+      if (v < -0.1)  return { color: "#1c60e0", weight: 1.8 };
+      if (v < 0)     return { color: "#5090f0", weight: 1.4 };
+      if (v > 0.2)   return { color: "#a00000", weight: 2.0 };
+      if (v > 0.1)   return { color: "#d83010", weight: 1.8 };
+      return { color: "#e87040", weight: 1.4 };
+    };
+    try {
+      const { field, rows, cols } = buildField(latSet2, lonSet2, overlayGrid);
+      const contourGroup = L.layerGroup();
+      for (const level of levels) {
+        const lines = marchingSquares(latSet2, lonSet2, field, rows, cols, level);
+        if (!lines.length) continue;
+        const { color, weight } = levelStyle(level);
+        const isZero = Math.abs(level) < 0.025;
+        lines.forEach(seg => {
+          const latlngs = seg.map(([lon, lat]) => [lat, lon]);
+          if (isZero) L.polyline(latlngs, { color: "rgba(255,255,255,0.55)", weight: weight + 3, interactive: false }).addTo(contourGroup);
+          L.polyline(latlngs, { color, weight, opacity: 0.9, interactive: false }).addTo(contourGroup);
+        });
+      }
+      contourGroup.addTo(map);
+      slaContourLayerRef.current = contourGroup;
+    } catch(err) { console.error("[SLA contour]", err); }
+  }, [mapReady, activeDataLayer, altimetryData, waterMaskVersion, repaintTrigger]);
 
   // ── Wind raster ─────────────────────────────────────────────────────────────
   useEffect(() => {

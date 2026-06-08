@@ -202,6 +202,24 @@ EAST  = -72.21
 
 ---
 
+### 6. Altimetry (SLA) contour lines
+
+**Layer:** `activeDataLayer === "altimetry"` renders SLA (sea level anomaly) as contour polylines, not a raster.
+
+**Data source:** `altimetry_latest_grid.json` from SSTv2 `DailySST/Altimetry/`. Shape: `{lats, lons, sla}` where `sla[i][j]` is the SLA value at `(lats[i], lons[j])`.
+
+**Rendering approach:** `marchingSquares` + `buildField` (same functions used for SST isotherms). Contours at 0.05m intervals from 5th–95th percentile of actual data.
+
+**Color scheme:** Negative SLA → blue (`#0018b0` to `#5090f0`), zero ± 0.025m → dark gray with white glow, positive SLA → red (`#e87040` to `#a00000`).
+
+**No raster for altimetry:** The overlay `useEffect` altimetry branch computes the legend range (`onSlaRange` callback) and returns early — no `gridToDataURL` call. The `slaContourLayerRef` useEffect draws all contour polylines.
+
+**No `expandCoarseGrid` needed:** Altimetry is rendered as vector contours directly from the native CMEMS 0.125° grid — not as a raster image overlay.
+
+**leaflet-velocity currents:** `_build_velocity_json` in `fetch_ocean_dynamics.py` must include `"parameterCategory": 2` in both U and V headers, or leaflet-velocity won't recognize the components and will show "no data."
+
+---
+
 ## If rendering breaks, check in this order
 
 1. **CHL shifted west** → check that `expandCoarseGrid` is called for the chlorophyll branch and result passed with `latSet/lonSet` to `gridToDataURL` (problem 5). Both CHL and SeaColor should use this pattern.
