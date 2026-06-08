@@ -130,4 +130,14 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           mkdir -p DailySST/logs
           cp hotspot_analysis.log \
-             DailySST/logs/h
+             DailySST/logs/hotspot_analysis_${{ steps.date.outputs.date }}.log 2>/dev/null || true
+          git add DailySST/logs/ 2>/dev/null || true
+          git diff --cached --quiet && echo "No log changes" || \
+            git commit -m "log: hotspot analysis ${{ steps.date.outputs.date }}"
+          git push origin HEAD 2>/dev/null || true
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Fishing hotspot analysis failed for ${{ steps.date.outputs.date }}"
+          echo "Check the log above or download the run logs for details."

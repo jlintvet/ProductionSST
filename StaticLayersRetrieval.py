@@ -661,4 +661,81 @@ def write_noaa_coastline(session: requests.Session) -> None:
 def write_land_mask(session: requests.Session) -> None:
     log.info("Fetching Natural Earth 10m land polygons ...")
     r = session.get(NE_LAND_URL, timeout=TIMEOUT)
-  
+    r.raise_for_status()
+    data     = r.json()
+    features = []
+    for feat in data.get("features", []):
+        geom  = feat.get("geometry", {})
+        gtype = geom.get("type", "")
+        if gtype == "Polygon":
+            polys = [geom["coordinates"]]
+        elif gtype == "MultiPolygon":
+            polys = geom["coordinates"]
+        else:
+            continue
+        clipped_polys = []
+        for poly in polys:
+            if not poly:
+                continue
+            exterior = poly[0]
+            if not _ring_intersects_bbox(exterior):
+                continue
+            clipped_rings = []
+            for ring in poly:
+                clipped = [[round(pt[0], 5), round(pt[1], 5)] for pt in ring]
+                if len(clipped) >= 3:
+                    clipped_rings.append(clipped)
+            if clipped_rings:
+                clipped_polys.append(clipped_rings)
+        if not clipped_polys:
+            continue
+        geom_out = (
+            {"type": "Polygon",      "coordinates": clipped_polys[0]}
+            if len(clipped_polys) == 1
+            else {"type": "MultiPolygon", "coordinates": clipped_polys}
+        )
+        features.append({
+            "type":       "Feature",
+            "geometry":   geom_out,
+            "properties": {"type": "land", "source": "Natural Earth 10m"},
+        })
+    dest = OUTPUT_DIR / "landmask.json"
+    with open(dest, "w", encoding="utf-8") as fh:
+        json.dump({"type": "FeatureCollection", "features": features}, fh)
+    log.info("Land mask written: %d polygon features  (%.1f KB)",
+             len(features), dest.stat().st_size / 1024)
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+def main() -> None:
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    session = _make_session()
+    # ── Ocean mask polygons (needed for bathy masking) ──────────────────────
+    log.info("=== Ocean Mask ===")
+    ocean_rings = _fetch_ocean_rings(session)
+    # ── Bathymetry (contours + raw grid) ────────────────────────────────────
+    log.info("=== Bathymetry ===")
+    if _bathy_cache_valid():
+        log.info("Using cached bathymetry — skipping fetch.")
+    else:
+        rows = _fetch_bathymetry(session)
+        log.info("Building depth grid ...")
+        lats, lons, grid = _build_grid(rows, ocean_rings=ocean_rings)
+        log.info("Grid: %d lats × %d lons", len(lats), len(lons))
+        write_contours(lats, lons, grid)
+        write_bathymetry_grid(lats, lons, grid)
+    # ── Coastline lines ─────────────────────────────────────────────────────
+    log.info("=== Coastline ===")
+    if not _static_cache_valid(OUTPUT_DIR / "noaa_coastline.json"):
+        write_noaa_coastline(session)
+    # ── Land mask polygons ──────────────────────────────────────────────────
+    log.info("=== Land Mask ===")
+    if not _static_cache_valid(OUTPUT_DIR / "landmask.json"):
+        write_land_mask(session)
+    # ── Wrecks / fishing spots ───────────────────────────────────────────────
+    # Always rebuild — source GPX files can change between runs.
+    log.info("=== Wrecks ===")
+    write_wrecks_json()
+    log.info("=== Done. ===")
+if __name__ == "__main__":
+    main()

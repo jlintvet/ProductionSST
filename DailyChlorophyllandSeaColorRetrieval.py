@@ -973,4 +973,5 @@ def main() -> None:
              len(sc_fetched), RETENTION_DAYS)
 
 
-if __name__ == 
+if __name__ == "__main__":
+    main()

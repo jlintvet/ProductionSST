@@ -853,4 +853,92 @@ def write_hotspots(date: datetime.date, species_results: dict) -> pathlib.Path:
     log.info("Wrote %s  (%.1f KB)", dest.name, dest.stat().st_size / 1024)
     return dest
 
-def purge_old_hotsp
+def purge_old_hotspots(keep_days: int) -> None:
+    cutoff = datetime.date.today() - datetime.timedelta(days=keep_days)
+    for p in OUTPUT_DIR.glob("fishing_hotspots_????-??-??.json"):
+        try:
+            file_date = datetime.date.fromisoformat(p.stem.replace("fishing_hotspots_", ""))
+            if file_date < cutoff:
+                p.unlink()
+                log.info("Purged old hotspot file: %s", p.name)
+        except ValueError:
+            pass
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Main
+# ─────────────────────────────────────────────────────────────────────────────
+def main() -> None:
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    STATIC_DIR.mkdir(parents=True, exist_ok=True)
+
+    date_env = os.environ.get("DATE", "").strip()
+    date = datetime.date.fromisoformat(date_env) if date_env else datetime.date.today()
+    log.info("=== FishingHotspotAnalyzer  date=%s  month=%s ===",
+             date.isoformat(), calendar.month_name[date.month])
+
+    species_filter = os.environ.get("SPECIES", "").strip().lower() or None
+    skip_narrative = os.environ.get("SKIP_NARRATIVE", "").strip() == "1"
+
+    if not CONFIG_PATH.exists():
+        log.error("species_config.json not found at %s", CONFIG_PATH)
+        sys.exit(1)
+    with open(CONFIG_PATH, encoding="utf-8") as f:
+        config = json.load(f)
+    all_species = config["species"]
+    if species_filter:
+        if species_filter not in all_species:
+            log.error("Unknown species '%s'. Valid: %s", species_filter, list(all_species))
+            sys.exit(1)
+        all_species = {species_filter: all_species[species_filter]}
+    enabled = {k: v for k, v in all_species.items() if v.get("enabled", True)}
+    log.info("Species to analyze: %s", list(enabled))
+
+    # ── Load composite ──────────────────────────────────────────────────────
+    composite = load_composite(date)
+    if composite is None:
+        log.error("No composite data available for %s — aborting.", date)
+        sys.exit(1)
+    composite_lookup = build_composite_lookup(composite)
+    gradient_lookup  = compute_sst_gradient(composite)
+    lat_set = composite["latSet"]
+    lon_set = composite["lonSet"]
+    composite_step = abs(lat_set[1] - lat_set[0]) if len(lat_set) > 1 else 0.04
+    log.info("Composite loaded: %d points  step=%.4f°", len(composite_lookup), composite_step)
+
+    # ── Load bathymetry ──────────────────────────────────────────────────────
+    bathy_raw = load_bathymetry_grid()
+    if bathy_raw is None:
+        log.warning("Bathymetry unavailable — depth scoring disabled.")
+        bathy_lookup = {}
+    else:
+        bathy_lookup = build_bathy_lookup(bathy_raw)
+        log.info("Bathy lookup: %d entries", len(bathy_lookup))
+
+    # ── Load CHL / kd490 ────────────────────────────────────────────────────
+    chl_lookup   = load_local_chl(date)
+    kd490_lookup = load_local_kd490(date)
+
+    # ── Analyze each species ─────────────────────────────────────────────────
+    species_results: dict = {}
+    for sp_key, sp_cfg in enabled.items():
+        try:
+            result = analyze_species(
+                sp_key, sp_cfg,
+                composite_lookup, gradient_lookup,
+                bathy_lookup, chl_lookup, kd490_lookup,
+                composite_step=composite_step,
+                date=date,
+                skip_narrative=skip_narrative,
+            )
+            species_results[sp_key] = result
+        except Exception as exc:
+            log.exception("  Error analyzing %s: %s", sp_key, exc)
+            species_results[sp_key] = {"zones": [], "error": str(exc)}
+
+    # ── Write output ─────────────────────────────────────────────────────────
+    purge_old_hotspots(keep_days=7)
+    write_hotspots(date, species_results)
+    log.info("=== Done ===")
+
+if __name__ == "__main__":
+    main()

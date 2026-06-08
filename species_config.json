@@ -147,4 +147,71 @@
         "color": 0.05
       },
       "prime_months": [3, 4, 5, 6, 7, 8, 9, 10, 11],
-      "peak_months": [3, 4, 5, 9, 10, 11
+      "peak_months": [3, 4, 5, 9, 10, 11],
+      "min_zone_score": 0.6,
+      "max_cluster_cells": 60,
+      "structure_notes": "Wrecks, reefs, nearshore shoals, inlet ledges. Schools follow bait pods (menhaden, cigar minnows). Live bait most effective for big smokers. Spanish mackerel presence signals kings are near.",
+      "seasonal_context": "Mar-Nov; spring and fall migration peaks. Big smokers peak in Oct. Narrow 68-73 F SST window — one of the most temp-specific species. Follow bait more than break side. In summer heat, cooler side of a break can produce."
+    },
+    "white_marlin": {
+      "display_name": "White Marlin",
+      "color": "#8b5cf6",
+      "enabled": true,
+      "sst_target_f": 78,
+      "sst_range_f": [72, 82],
+      "sst_sweet_spot_f": [76, 80],
+      "prefer_side": "warm",
+      "depth_range_ft": [210, 600],
+      "depth_ideal_ft": [240, 480],
+      "chl_range_mg_m3": [0.02, 0.2],
+      "kd490_max": 0.08,
+      "chl_required": false,
+      "break_required": true,
+      "break_strength_min": "weak",
+      "sst_score_min": 0,
+      "weights": {
+        "sst": 0.3,
+        "break": 0.25,
+        "depth": 0.18,
+        "chl": 0.1,
+        "color": 0.17
+      },
+      "prime_months": [7, 8, 9],
+      "peak_months": [8],
+      "min_zone_score": 0.6,
+      "max_cluster_cells": 100,
+      "structure_notes": "Warm, clear blue water with bait concentration (squid, flying fish). Stable eddy seams — NOT fast-running current rips. Trolling ballyhoo and small skirted lures. Satellite imaging essential to locate eddy pockets.",
+      "seasonal_context": "Late Jul-Sep; classic peak is second week of August at Oregon Inlet. North of Cape Hatteras best where stable eddies form more frequently. Whites prefer slow-turning warm eddies shoreward of the Stream. Clarity and current stability matter as much as temperature."
+    },
+    "blue_marlin": {
+      "display_name": "Blue Marlin",
+      "color": "#0ea5e9",
+      "enabled": true,
+      "sst_target_f": 78,
+      "sst_range_f": [71, 88],
+      "sst_sweet_spot_f": [74, 82],
+      "prefer_side": "warm",
+      "depth_range_ft": [600, 6000],
+      "depth_ideal_ft": [600, 3000],
+      "chl_range_mg_m3": [0.02, 0.25],
+      "kd490_max": 0.1,
+      "chl_required": false,
+      "break_required": false,
+      "break_strength_min": "weak",
+      "sst_score_min": 0,
+      "weights": {
+        "sst": 0.32,
+        "break": 0.18,
+        "depth": 0.28,
+        "chl": 0.1,
+        "color": 0.12
+      },
+      "prime_months": [6, 7, 8, 9],
+      "peak_months": [7, 8],
+      "min_zone_score": 0.58,
+      "max_cluster_cells": 200,
+      "structure_notes": "Deep offshore Gulf Stream and warm-core eddies. Most temp-tolerant billfish. Largest fish prefer the cooler edge of the 74-82 F band. Trolling large skirted lures and rigged baits at speed.",
+      "seasonal_context": "Jun-Sep; peak Jul-Aug. Broadest SST tolerance of all target species (71-88 F). Deep water specialist: 100fm+ (600ft+). Largest fish prefer cooler edge of the action band. Follow the Gulf Stream edge and warm eddies."
+    }
+  }
+}
