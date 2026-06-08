@@ -159,18 +159,19 @@ function windSpeedColor(val, min, max) {
 }
 // SLA colorscale: blue (negative) → white (zero) → red (positive)
 const SLA_STOPS = [
-  [0.0, [  0,  50, 200]], // strong negative — deep blue
-  [0.3, [ 80, 140, 255]], // moderate negative
-  [0.45,[180, 210, 255]], // slight negative — light blue
-  [0.5, [255, 255, 255]], // zero anomaly — white
-  [0.55,[255, 210, 180]], // slight positive — light red
-  [0.7, [255, 120,  80]], // moderate positive
-  [1.0, [200,   0,   0]], // strong positive — deep red
+  [0.0,  [  0,  20, 160]], // strong negative — deep blue
+  [0.25, [ 40, 100, 230]], // moderate negative
+  [0.43, [140, 190, 255]], // slight negative — light blue
+  [0.5,  [248, 248, 248]], // zero anomaly — near-white
+  [0.57, [255, 190, 140]], // slight positive — light orange
+  [0.75, [255,  80,  30]], // moderate positive — orange-red
+  [1.0,  [160,   0,   0]], // strong positive — deep red
 ];
-function slaColor(val) {
-  // val in meters; display range ±0.4 m → mapped to [0,1]
+function slaColor(val, valMin, valMax) {
+  // val in meters; range is auto-scaled from data percentiles via valMin/valMax
   if (val == null || !Number.isFinite(val)) return null;
-  const t = Math.max(0, Math.min(1, (val + 0.4) / 0.8));
+  const lo = valMin ?? -0.4, hi = valMax ?? 0.4;
+  const t = hi > lo ? Math.max(0, Math.min(1, (val - lo) / (hi - lo))) : 0.5;
   return interpColor(t, SLA_STOPS);
 }
 
@@ -422,7 +423,7 @@ export default function SSTHeatmapLeaflet(props) {
     BATHY_CONTOURS_URL, WRECKS_URL,
     isPro,
     currentsData, currentsLoading, showCurrents, setShowCurrents,
-    altimetryData,
+    altimetryData, onSlaRange,
   } = props;
 
   const { latSet, lonSet, grid } = data;
@@ -911,7 +912,7 @@ export default function SSTHeatmapLeaflet(props) {
     if (!mapReady || !map || !latSet.length) return;
     const mask = waterMaskRef.current; if (!mask) return;
     if (sstOverlayRef.current) { map.removeLayer(sstOverlayRef.current); sstOverlayRef.current = null; }
-    if (!showSSTLayer || activeDataLayer !== "sst") return;
+    if (!showSSTLayer || (activeDataLayer !== "sst" && activeDataLayer !== "altimetry")) return;
     const rangeMin = sstRange?.min !== undefined ? sstRange.min : undefined;
     const rangeMax = sstRange?.max !== undefined ? sstRange.max : undefined;
     let cancelled = false;
@@ -986,11 +987,22 @@ export default function SSTHeatmapLeaflet(props) {
       }
       latSet2 = [...rawLats].sort((a, b) => b - a);
       lonSet2 = [...rawLons].sort((a, b) => a - b);
-      min2 = -0.4; max2 = 0.4; colorFn = slaColor;
+      // Auto-scale: use 5th/95th percentile of actual data, symmetric around 0, capped at ±0.4m
+      const slaVals = Object.values(overlayGrid).filter(v => Number.isFinite(v)).sort((a,b)=>a-b);
+      if (slaVals.length > 10) {
+        const p5  = slaVals[Math.floor(slaVals.length * 0.05)];
+        const p95 = slaVals[Math.floor(slaVals.length * 0.95)];
+        const autoRange = Math.min(0.4, Math.max(Math.abs(p5), Math.abs(p95)));
+        min2 = -autoRange; max2 = autoRange;
+      } else {
+        min2 = -0.2; max2 = 0.2;
+      }
+      colorFn = slaColor;
+      onSlaRange?.({ min: min2, max: max2 });
     } else { return; }
     if (!latSet2.length) return;
     let cancelled = false;
-    const useRefGrid = activeDataLayer==="seacolor" || activeDataLayer==="chlorophyll";
+    const useRefGrid = activeDataLayer==="seacolor" || activeDataLayer==="chlorophyll" || activeDataLayer==="altimetry";
     const renderLatSet = useRefGrid ? latSet : latSet2;
     const renderLonSet = useRefGrid ? lonSet : lonSet2;
     const renderGrid   = useRefGrid ? expandCoarseGrid(latSet2,lonSet2,overlayGrid,latSet,lonSet) : overlayGrid;
@@ -1003,7 +1015,8 @@ export default function SSTHeatmapLeaflet(props) {
       if (cancelled || !result) return;
       const { dataURL, west, east, north, south } = result;
       blobUrlsRef.current.push(dataURL);
-      const overlay = L.imageOverlay(dataURL, [[south, west], [north, east]], { opacity: 0.92, interactive: false });
+      const overlayOpacity = activeDataLayer === "altimetry" ? 0.62 : 0.92;
+      const overlay = L.imageOverlay(dataURL, [[south, west], [north, east]], { opacity: overlayOpacity, interactive: false });
       overlay.addTo(map); overlayLayerRef.current = overlay;
     });
     return () => { cancelled = true; };
