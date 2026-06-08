@@ -1059,7 +1059,7 @@ export default function SSTHeatmapLeaflet(props) {
       },
       data: hourData.velocityJSON, minVelocity: 0, maxVelocity: maxSpd,
       velocityScale: 0.04,   // currents ~10x slower than wind — scale up particle speed
-      colorScale: ["rgba(255,255,255,0.4)","rgba(255,255,255,0.65)","rgba(255,255,255,0.85)","rgba(255,255,255,0.95)"],
+      colorScale: ["#38bdf8","#0ea5e9","#0284c7","#0369a1","#1e3a5f"],
     });
     currentsLayer.addTo(map);
     currentsLayerRef.current = currentsLayer;

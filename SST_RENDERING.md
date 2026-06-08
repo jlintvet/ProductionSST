@@ -214,4 +214,18 @@ EAST  = -72.21
 
 **No raster for altimetry:** The overlay `useEffect` altimetry branch computes the legend range (`onSlaRange` callback) and returns early — no `gridToDataURL` call. The `slaContourLayerRef` useEffect draws all contour polylines.
 
-**No `expandCoarseGrid` needed:** Altimetry is rendered as vector contours directly from the native
+**No `expandCoarseGrid` needed:** Altimetry is rendered as vector contours directly from the native CMEMS 0.125° grid — not as a raster image overlay.
+
+**leaflet-velocity currents:** `_build_velocity_json` in `fetch_ocean_dynamics.py` must include `"parameterCategory": 2` in both U and V headers, or leaflet-velocity won't recognize the components and will show "no data."
+
+---
+
+## If rendering breaks, check in this order
+
+1. **CHL shifted west** → check that `expandCoarseGrid` is called for the chlorophyll branch and result passed with `latSet/lonSet` to `gridToDataURL` (problem 5). Both CHL and SeaColor should use this pattern.
+2. **SeaColor shifted** → same as above — check `expandCoarseGrid` is being called for sea color branch (problem 4).
+3. **SST or any layer shifts north/south** → check Mercator math is still in `gridToDataURL` (problem 2).
+4. **CHL overlay blank / no data** → check `day.stats` exists; `min2=day.stats.min` will throw if stats is missing. Also check `expandCoarseGrid` result isn't empty (all nulls from full cloud cover).
+5. **Mask not applying** → check `waterMaskRef.current` is not null before calling `gridToDataURL`.
+6. **Users get localhost error on email confirmation** → fix Supabase Site URL.
+7. **Users land on upgrade screen after login** → check `user_subscriptions` table — row may not exist.

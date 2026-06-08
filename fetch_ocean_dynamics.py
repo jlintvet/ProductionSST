@@ -694,4 +694,7 @@ def main():
               f"SSH {df_altimetry['ssh_m'].min():.3f}–{df_altimetry['ssh_m'].max():.3f} m")
     print("=" * 60)
     print(f"\n  Files → {CURR_DIR.resolve()}")
-    print(f"         → {ALT_DIR.reso
+    print(f"         → {ALT_DIR.resolve()}")
+
+if __name__ == "__main__":
+    main()
