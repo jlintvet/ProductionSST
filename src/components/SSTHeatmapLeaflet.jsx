@@ -689,7 +689,7 @@ export default function SSTHeatmapLeaflet(props) {
       }
       // Altimetry lookup
       let sla_m = null;
-      if (showAltimetryRef.current && altimetryDataRef.current) {
+      if (activeDataLayerRef.current === "altimetry" && altimetryDataRef.current) {
         const alt = altimetryDataRef.current;
         if (alt.lats && alt.lons && alt.sla) {
           const li = alt.lats.reduce((bi,v,i)=>Math.abs(v-lat)<Math.abs(alt.lats[bi]-lat)?i:bi,0);
@@ -734,7 +734,7 @@ export default function SSTHeatmapLeaflet(props) {
       setTouchMarker({ px, py });
       let touchCurrSpeed_ms=null,touchCurrDir_deg=null,touchSla_m=null;
       if(showCurrentsRef.current&&currentsDataRef.current?.hours?.length){const ch=currentsDataRef.current.hours[0];if(ch?.grid?.length){let best=null,bestDist=Infinity;for(const p of ch.grid){const d=(p.lat-lat)**2+(p.lon-lon)**2;if(d<bestDist){bestDist=d;best=p;}}if(best){touchCurrSpeed_ms=best.speed_ms??Math.sqrt((best.u||0)**2+(best.v||0)**2);touchCurrDir_deg=best.dir_deg??((Math.atan2(best.u||0,best.v||0)*180/Math.PI)+360)%360;}}}
-      if(showAltimetryRef.current&&altimetryDataRef.current){const alt=altimetryDataRef.current;if(alt.lats&&alt.lons&&alt.sla){const li=alt.lats.reduce((bi,v,i)=>Math.abs(v-lat)<Math.abs(alt.lats[bi]-lat)?i:bi,0);const lj=alt.lons.reduce((bj,v,j)=>Math.abs(v-lon)<Math.abs(alt.lons[bj]-lon)?j:bj,0);const row=alt.sla[li];if(row)touchSla_m=row[lj]??null;}}
+      if(activeDataLayerRef.current==="altimetry"&&altimetryDataRef.current){const alt=altimetryDataRef.current;if(alt.lats&&alt.lons&&alt.sla){const li=alt.lats.reduce((bi,v,i)=>Math.abs(v-lat)<Math.abs(alt.lats[bi]-lat)?i:bi,0);const lj=alt.lons.reduce((bj,v,j)=>Math.abs(v-lon)<Math.abs(alt.lons[bj]-lon)?j:bj,0);const row=alt.sla[li];if(row)touchSla_m=row[lj]??null;}}
       setHoverInfo({ px, py: py - 70, sst, depth_ft, chl: touchChl, color_class: touchColorClass, kd490: touchKd490, windSpeed_kt: touchWindSpeed_kt, windDir_deg: touchWindDir_deg, currSpeed_ms: touchCurrSpeed_ms, currDir_deg: touchCurrDir_deg, sla_m: touchSla_m,
         dist: refLoc ? distanceNm(refLoc.lat, refLoc.lon, lat, lon) : null,
         bearing: refLoc ? bearingDeg(refLoc.lat, refLoc.lon, lat, lon) : null,
@@ -1606,9 +1606,9 @@ export default function SSTHeatmapLeaflet(props) {
             <button onClick={() => setMobilePanel(p => p === "altimetry" ? null : "altimetry")} title="Altimetry"
               className="flex items-center justify-center rounded-lg shadow-sm border"
               style={{ width:30, height:30, padding:0,
-                background: mobilePanel==="altimetry" ? "#7c3aed" : showAltimetry ? "rgba(124,58,237,0.15)" : "rgba(255,255,255,0.9)",
-                borderColor: mobilePanel==="altimetry" ? "#7c3aed" : showAltimetry ? "#7c3aed" : "#e2e8f0" }}>
-              <span style={{ fontSize:9, fontWeight:700, color: mobilePanel==="altimetry" ? "#fff" : showAltimetry ? "#7c3aed" : "#64748b", lineHeight:1 }}>SLA</span>
+                background: activeDataLayer==="altimetry" ? "#7c3aed" : "rgba(255,255,255,0.9)",
+                borderColor: activeDataLayer==="altimetry" ? "#7c3aed" : "#e2e8f0" }}>
+              <span style={{ fontSize:9, fontWeight:700, color: activeDataLayer==="altimetry" ? "#fff" : "#64748b", lineHeight:1 }}>SLA</span>
             </button>
             {/* Tools */}
             <button onClick={() => setMobilePanel(p => p === "tools" ? null : "tools")} title="Tools"
@@ -1963,10 +1963,10 @@ export default function SSTHeatmapLeaflet(props) {
                 {mobilePanel === "altimetry" && (
                   <div className="flex flex-col gap-1.5">
                     <div className="text-[9px] text-slate-400 font-semibold uppercase tracking-wide">Altimetry</div>
-                    <MobileProGate isPro={isPro} label="Sea level anomaly overlay is available on the Pro plan.">
-                      <button onClick={() => setShowAltimetry(v => !v)}
-                        className={`text-[11px] font-semibold px-3 py-2 rounded-lg border flex items-center justify-center gap-1.5 transition-colors ${showAltimetry ? "bg-violet-600 text-white border-violet-600" : "bg-white text-slate-600 border-slate-300"}`}>
-                        &#x1F30D; {altimetryLoading ? "Loading…" : showAltimetry ? "SLA on" : "Sea level anomaly"}
+                    <MobileProGate isPro={isPro} label="Sea level anomaly layer is available on the Pro plan.">
+                      <button onClick={() => setActiveDataLayer(l => l === "altimetry" ? "sst" : "altimetry")}
+                        className={`text-[11px] font-semibold px-3 py-2 rounded-lg border flex items-center justify-center gap-1.5 transition-colors ${activeDataLayer === "altimetry" ? "bg-violet-600 text-white border-violet-600" : "bg-white text-slate-600 border-slate-300"}`}>
+                        🌊 {activeDataLayer === "altimetry" ? "Altimetry on" : "Altimetry"}
                       </button>
                     </MobileProGate>
                   </div>
@@ -2039,7 +2039,7 @@ export default function SSTHeatmapLeaflet(props) {
                   {activeDataLayer==="seacolor"&&hoverInfo.kd490!=null&&<div className="text-teal-600 font-semibold">{hoverInfo.kd490.toFixed(4)} m-1</div>}
                   {(activeDataLayer==="windmap"||showWindOverlay)&&hoverInfo.windSpeed_kt!=null&&<div className="text-sky-600 font-semibold">{Math.round(hoverInfo.windSpeed_kt)} kt{hoverInfo.windDir_deg!=null ? ` · ${bearingLabel(hoverInfo.windDir_deg)}` : ""}</div>}
                   {showCurrents&&hoverInfo.currSpeed_ms!=null&&<div className="text-cyan-700 font-semibold">{hoverInfo.currSpeed_ms.toFixed(2)} m/s current{hoverInfo.currDir_deg!=null ? ` · ${bearingLabel(hoverInfo.currDir_deg)}` : ""}</div>}
-                  {showAltimetry&&hoverInfo.sla_m!=null&&<div className="text-violet-600 font-semibold">SLA {hoverInfo.sla_m>=0?"+":""}{hoverInfo.sla_m.toFixed(3)} m</div>}
+                  {activeDataLayer==="altimetry"&&hoverInfo.sla_m!=null&&<div className="text-violet-600 font-semibold">SLA {hoverInfo.sla_m>=0?"+":""}{hoverInfo.sla_m.toFixed(3)} m</div>}
                   {hoverInfo.depth_ft!=null&&<div className="text-blue-600 font-medium">{Math.round(hoverInfo.depth_ft)} ft / {Math.round(hoverInfo.depth_ft/6)} fth</div>}
                   {hoverInfo.dist!=null&&<div className="text-slate-600">{hoverInfo.dist.toFixed(1)} nm {Math.round(hoverInfo.bearing)}° {bearingLabel(hoverInfo.bearing)}</div>}
                   {hoverInfo.sst==null&&hoverInfo.depth_ft==null&&hoverInfo.chl==null&&hoverInfo.kd490==null&&hoverInfo.windSpeed_kt==null&&hoverInfo.dist==null&&<div className="text-slate-400">No data</div>}
