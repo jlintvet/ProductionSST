@@ -1132,7 +1132,7 @@ export default function SSTHeatmapLeaflet(props) {
         [Math.min(...latSet), Math.min(...lonSet)],
         [Math.max(...latSet), Math.max(...lonSet)]
       );
-      const raster = L.imageOverlay(result.dataURL, bounds, { opacity: 0.45, zIndex: 300 });
+      const raster = L.imageOverlay(result.dataURL, bounds, { opacity: 0.55, zIndex: 200 });
       raster.addTo(mapRef.current);
       altimetryOverlayRef.current = raster;
     });
