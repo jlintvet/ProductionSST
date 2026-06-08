@@ -157,6 +157,22 @@ function windSpeedColor(val, min, max) {
   if (val == null || !Number.isFinite(val) || val < 0) return null;
   return interpColor(Math.max(0, Math.min(1, (val - min) / (max - min))), WIND_SPEED_STOPS);
 }
+// SLA colorscale: blue (negative) → white (zero) → red (positive)
+const SLA_STOPS = [
+  [0.0, [  0,  50, 200]], // strong negative — deep blue
+  [0.3, [ 80, 140, 255]], // moderate negative
+  [0.45,[180, 210, 255]], // slight negative — light blue
+  [0.5, [255, 255, 255]], // zero anomaly — white
+  [0.55,[255, 210, 180]], // slight positive — light red
+  [0.7, [255, 120,  80]], // moderate positive
+  [1.0, [200,   0,   0]], // strong positive — deep red
+];
+function slaColor(val) {
+  // val in meters; display range ±0.4 m → mapped to [0,1]
+  if (val == null || !Number.isFinite(val)) return null;
+  const t = Math.max(0, Math.min(1, (val + 0.4) / 0.8));
+  return interpColor(t, SLA_STOPS);
+}
 
 export const FISH_SPECIES=[{key:"yellowfin",label:"Yellowfin",color:"#f59e0b"},{key:"mahi",label:"Mahi",color:"#10b981"},{key:"wahoo",label:"Wahoo",color:"#3b82f6"},{key:"bluefin",label:"Bluefin",color:"#6366f1"},{key:"kingfish",label:"Kingfish",color:"#ef4444"},{key:"white_marlin",label:"W. Marlin",color:"#8b5cf6"},{key:"blue_marlin",label:"B. Marlin",color:"#0ea5e9"}];
 
@@ -405,6 +421,8 @@ export default function SSTHeatmapLeaflet(props) {
     onNotesUpdated,
     BATHY_CONTOURS_URL, WRECKS_URL,
     isPro,
+    currentsData, currentsLoading, showCurrents, setShowCurrents,
+    altimetryData, altimetryLoading, showAltimetry, setShowAltimetry,
   } = props;
 
   const { latSet, lonSet, grid } = data;
@@ -430,6 +448,8 @@ export default function SSTHeatmapLeaflet(props) {
   const highlightLayerRef= useRef(null);
   const velocityLayerRef    = useRef(null);
   const windRasterOverlayRef= useRef(null);
+  const currentsLayerRef    = useRef(null);
+  const altimetryOverlayRef = useRef(null);
   const blobUrlsRef         = useRef([]);
 
   const selectedLocationRef = useRef(selectedLocation);
@@ -448,6 +468,10 @@ export default function SSTHeatmapLeaflet(props) {
   const windHourIndexRef = useRef(windHourIndex); useEffect(() => { windHourIndexRef.current = windHourIndex; }, [windHourIndex]);
   const isWindMapRef = useRef(false); useEffect(() => { isWindMapRef.current = (activeDataLayer === "windmap"); }, [activeDataLayer]);
   const showWindOverlayRef = useRef(false); useEffect(() => { showWindOverlayRef.current = showWindOverlay; }, [showWindOverlay]);
+  const currentsDataRef  = useRef(currentsData);  useEffect(() => { currentsDataRef.current = currentsData; }, [currentsData]);
+  const showCurrentsRef  = useRef(false);          useEffect(() => { showCurrentsRef.current = showCurrents; }, [showCurrents]);
+  const altimetryDataRef = useRef(altimetryData);  useEffect(() => { altimetryDataRef.current = altimetryData; }, [altimetryData]);
+  const showAltimetryRef = useRef(false);          useEffect(() => { showAltimetryRef.current = showAltimetry; }, [showAltimetry]);
   const compositeDataRef=useRef(compositeData);useEffect(()=>{compositeDataRef.current=compositeData;},[compositeData]);
   const userInteractedRef = useRef(false);
 
@@ -656,7 +680,27 @@ export default function SSTHeatmapLeaflet(props) {
       }
       const refLoc = selectedLocationRef.current;
       const containerPt = map.latLngToContainerPoint(e.latlng);
-      setHoverInfo({ px: containerPt.x, py: containerPt.y, sst, depth_ft, chl, color_class, kd490, windSpeed_kt, windDir_deg,
+      // Currents lookup (same grid format as wind)
+      let currSpeed_ms = null, currDir_deg = null;
+      if (showCurrentsRef.current && currentsDataRef.current?.hours?.length) {
+        const ch = currentsDataRef.current.hours[0];
+        if (ch?.grid?.length) {
+          let best = null, bestDist = Infinity;
+          for (const p of ch.grid) { const d = (p.lat-lat)**2+(p.lon-lon)**2; if (d<bestDist){bestDist=d;best=p;} }
+          if (best) { currSpeed_ms = best.speed_ms ?? Math.sqrt((best.u||0)**2+(best.v||0)**2); currDir_deg = best.dir_deg ?? (Math.atan2(best.u||0, best.v||0)*180/Math.PI+360)%360; }
+        }
+      }
+      // Altimetry lookup
+      let sla_m = null;
+      if (showAltimetryRef.current && altimetryDataRef.current) {
+        const alt = altimetryDataRef.current;
+        if (alt.lats && alt.lons && alt.sla) {
+          const li = alt.lats.reduce((bi,v,i)=>Math.abs(v-lat)<Math.abs(alt.lats[bi]-lat)?i:bi,0);
+          const lj = alt.lons.reduce((bj,v,j)=>Math.abs(v-lon)<Math.abs(alt.lons[bj]-lon)?j:bj,0);
+          const row = alt.sla[li]; if (row) sla_m = row[lj] ?? null;
+        }
+      }
+      setHoverInfo({ px: containerPt.x, py: containerPt.y, sst, depth_ft, chl, color_class, kd490, windSpeed_kt, windDir_deg, currSpeed_ms, currDir_deg, sla_m,
         dist: refLoc ? distanceNm(refLoc.lat, refLoc.lon, lat, lon) : null,
         bearing: refLoc ? bearingDeg(refLoc.lat, refLoc.lon, lat, lon) : null,
       });
@@ -691,7 +735,10 @@ export default function SSTHeatmapLeaflet(props) {
       if((tadl==="windmap"||showWindOverlayRef.current)&&windDataRef.current?.hours?.length){const wHour=windDataRef.current.hours[windHourIndexRef.current]??windDataRef.current.hours[0];if(wHour?.grid?.length){let best=null,bestDist=Infinity;for(const p of wHour.grid){const d=(p.lat-lat)**2+(p.lon-lon)**2;if(d<bestDist){bestDist=d;best=p;}}if(best){touchWindSpeed_kt=best.speed??Math.sqrt((best.u||0)**2+(best.v||0)**2);touchWindDir_deg=(Math.atan2(-(best.u||0),-(best.v||0))*180/Math.PI+360)%360;}}else if(wHour?.velocityJSON){const w=windFromVelocityJSON(wHour.velocityJSON,lat,lon);if(w){touchWindSpeed_kt=w.speed;touchWindDir_deg=w.dir;}}}
       const refLoc = selectedLocationRef.current;
       setTouchMarker({ px, py });
-      setHoverInfo({ px, py: py - 70, sst, depth_ft, chl: touchChl, color_class: touchColorClass, kd490: touchKd490, windSpeed_kt: touchWindSpeed_kt, windDir_deg: touchWindDir_deg,
+      let touchCurrSpeed_ms=null,touchCurrDir_deg=null,touchSla_m=null;
+      if(showCurrentsRef.current&&currentsDataRef.current?.hours?.length){const ch=currentsDataRef.current.hours[0];if(ch?.grid?.length){let best=null,bestDist=Infinity;for(const p of ch.grid){const d=(p.lat-lat)**2+(p.lon-lon)**2;if(d<bestDist){bestDist=d;best=p;}}if(best){touchCurrSpeed_ms=best.speed_ms??Math.sqrt((best.u||0)**2+(best.v||0)**2);touchCurrDir_deg=best.dir_deg??((Math.atan2(best.u||0,best.v||0)*180/Math.PI)+360)%360;}}}
+      if(showAltimetryRef.current&&altimetryDataRef.current){const alt=altimetryDataRef.current;if(alt.lats&&alt.lons&&alt.sla){const li=alt.lats.reduce((bi,v,i)=>Math.abs(v-lat)<Math.abs(alt.lats[bi]-lat)?i:bi,0);const lj=alt.lons.reduce((bj,v,j)=>Math.abs(v-lon)<Math.abs(alt.lons[bj]-lon)?j:bj,0);const row=alt.sla[li];if(row)touchSla_m=row[lj]??null;}}
+      setHoverInfo({ px, py: py - 70, sst, depth_ft, chl: touchChl, color_class: touchColorClass, kd490: touchKd490, windSpeed_kt: touchWindSpeed_kt, windDir_deg: touchWindDir_deg, currSpeed_ms: touchCurrSpeed_ms, currDir_deg: touchCurrDir_deg, sla_m: touchSla_m,
         dist: refLoc ? distanceNm(refLoc.lat, refLoc.lon, lat, lon) : null,
         bearing: refLoc ? bearingDeg(refLoc.lat, refLoc.lon, lat, lon) : null,
       });
@@ -979,6 +1026,37 @@ export default function SSTHeatmapLeaflet(props) {
     };
   }, [mapReady, windActive, windData, showWindOverlay, isWindMap, repaintTrigger]);
 
+  // ── Currents velocity layer ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (!mapReady || !map) return;
+    if (currentsLayerRef.current) { map.removeLayer(currentsLayerRef.current); currentsLayerRef.current = null; }
+    if (!showCurrents || !currentsData?.hours?.length) return;
+    if (!L.velocityLayer) { const t = setTimeout(() => setRepaintTrigger(p => p + 1), 500); return () => clearTimeout(t); }
+    const hourData = currentsData.hours[0];
+    if (!hourData?.velocityJSON) return;
+    const maxSpd = currentsData.maxSpeed ?? 2.0;
+    const currentsLayer = L.velocityLayer({
+      lineWidth: 1.5,
+      displayOptions: {
+        velocityType: "Current", position: "bottomleft", emptyString: "No current data",
+        angleConvention: "bearingCW", showCardinal: false,
+        speedUnit: "m/s", directionString: "Direction", speedString: "Speed",
+      },
+      data: hourData.velocityJSON, minVelocity: 0, maxVelocity: maxSpd,
+      velocityScale: 0.04,   // currents ~10x slower than wind — scale up particle speed
+      colorScale: ["#38bdf8","#0ea5e9","#0284c7","#0369a1","#1e3a5f"],
+    });
+    currentsLayer.addTo(map);
+    currentsLayerRef.current = currentsLayer;
+    if (currentsLayer._onLayerDidMove) {
+      const _orig = currentsLayer._onLayerDidMove.bind(currentsLayer);
+      currentsLayer._onLayerDidMove = function() { if (!this._map) return; try { _orig.call(this); } catch(e) {} };
+    }
+    return () => {
+      if (currentsLayerRef.current) { map.removeLayer(currentsLayerRef.current); currentsLayerRef.current = null; }
+    };
+  }, [mapReady, showCurrents, currentsData, repaintTrigger]);
+
   // ── Wind raster ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const map = mapRef.current;
@@ -1019,6 +1097,44 @@ export default function SSTHeatmapLeaflet(props) {
       });
     }
   }, [mapReady, windActive, windData, windHourIndex, isWindMap, waterMaskVersion]);
+
+  // ── Altimetry (SLA) color overlay ─────────────────────────────────────────
+  useEffect(() => {
+    if (!mapReady || !map) return;
+    if (altimetryOverlayRef.current) { map.removeLayer(altimetryOverlayRef.current); altimetryOverlayRef.current = null; }
+    if (!showAltimetry || !altimetryData?.lats?.length) return;
+    const { lats, lons, sla } = altimetryData;
+    if (!sla) return;
+    const latSet = lats.map(v => Math.round(v * 1e5) / 1e5);
+    const lonSet = lons.map(v => Math.round(v * 1e5) / 1e5);
+    // Build a grid object compatible with gridToDataURL: grid[lat_lon] = value
+    const slaGrid = {};
+    for (let i = 0; i < latSet.length; i++) {
+      const row = sla[i]; if (!row) continue;
+      for (let j = 0; j < lonSet.length; j++) {
+        const v = row[j];
+        if (v != null && Number.isFinite(v)) slaGrid[`${latSet[i]}_${lonSet[j]}`] = v;
+      }
+    }
+    // slaColor takes a single value (±0.4 m range), wrap to match gridToDataURL signature
+    const slaColorFn = (val) => slaColor(val);
+    Promise.resolve(
+      gridToDataURL(latSet, lonSet, slaGrid, -0.4, 0.4, slaColorFn, waterMaskRef.current)
+    ).then(result => {
+      if (!result || !mapRef.current) return;
+      if (altimetryOverlayRef.current) { mapRef.current.removeLayer(altimetryOverlayRef.current); altimetryOverlayRef.current = null; }
+      const bounds = L.latLngBounds(
+        [Math.min(...latSet), Math.min(...lonSet)],
+        [Math.max(...latSet), Math.max(...lonSet)]
+      );
+      const raster = L.imageOverlay(result.dataURL, bounds, { opacity: 0.55, zIndex: 200 });
+      raster.addTo(mapRef.current);
+      altimetryOverlayRef.current = raster;
+    });
+    return () => {
+      if (altimetryOverlayRef.current) { map.removeLayer(altimetryOverlayRef.current); altimetryOverlayRef.current = null; }
+    };
+  }, [mapReady, showAltimetry, altimetryData, waterMaskVersion]);
 
   // ── Isotherm layer ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1452,6 +1568,8 @@ export default function SSTHeatmapLeaflet(props) {
             showHotspots={showHotspots} setShowHotspots={setShowHotspots} hotspotLoading={hotspotLoading}
             selectedFishSpecies={selectedFishSpecies} setSelectedFishSpecies={setSelectedFishSpecies}
             showWindOverlay={showWindOverlay} setShowWindOverlay={setShowWindOverlay}
+            currentsLoading={currentsLoading} showCurrents={showCurrents} setShowCurrents={setShowCurrents}
+            altimetryLoading={altimetryLoading} showAltimetry={showAltimetry} setShowAltimetry={setShowAltimetry}
             showBathyLayer={showBathyLayer} setShowBathyLayer={setShowBathyLayer} jsonContoursLoading={jsonContoursLoading}
             showWrecks={showWrecks} setShowWrecks={setShowWrecks} wrecksLoading={wrecksLoading}
             selectedLocation={selectedLocation}
@@ -1500,6 +1618,22 @@ export default function SSTHeatmapLeaflet(props) {
                 background: mobilePanel==="wind" ? "#0284c7" : windActive ? "rgba(2,132,199,0.15)" : "rgba(255,255,255,0.9)",
                 borderColor: mobilePanel==="wind" ? "#0284c7" : windActive ? "#0284c7" : "#e2e8f0" }}>
               <Wind style={{ width:14, height:14, color: mobilePanel==="wind" ? "#fff" : windActive ? "#0284c7" : "#64748b" }}/>
+            </button>
+            {/* Currents */}
+            <button onClick={() => setMobilePanel(p => p === "currents" ? null : "currents")} title="Currents"
+              className="flex items-center justify-center rounded-lg shadow-sm border"
+              style={{ width:30, height:30, padding:0,
+                background: mobilePanel==="currents" ? "#0284c7" : showCurrents ? "rgba(2,132,199,0.15)" : "rgba(255,255,255,0.9)",
+                borderColor: mobilePanel==="currents" ? "#0284c7" : showCurrents ? "#0284c7" : "#e2e8f0" }}>
+              <span style={{ fontSize:9, fontWeight:700, color: mobilePanel==="currents" ? "#fff" : showCurrents ? "#0284c7" : "#64748b", lineHeight:1 }}>CUR</span>
+            </button>
+            {/* Altimetry */}
+            <button onClick={() => setMobilePanel(p => p === "altimetry" ? null : "altimetry")} title="Altimetry"
+              className="flex items-center justify-center rounded-lg shadow-sm border"
+              style={{ width:30, height:30, padding:0,
+                background: mobilePanel==="altimetry" ? "#7c3aed" : showAltimetry ? "rgba(124,58,237,0.15)" : "rgba(255,255,255,0.9)",
+                borderColor: mobilePanel==="altimetry" ? "#7c3aed" : showAltimetry ? "#7c3aed" : "#e2e8f0" }}>
+              <span style={{ fontSize:9, fontWeight:700, color: mobilePanel==="altimetry" ? "#fff" : showAltimetry ? "#7c3aed" : "#64748b", lineHeight:1 }}>SLA</span>
             </button>
             {/* Tools */}
             <button onClick={() => setMobilePanel(p => p === "tools" ? null : "tools")} title="Tools"
@@ -1837,7 +1971,33 @@ export default function SSTHeatmapLeaflet(props) {
                   </>
                 )}
 
-                {/* ── Tools panel ────────────────────────────────────── */}
+                {/* ── Currents panel ──────────────────────────────────── */}
+                {mobilePanel === "currents" && (
+                  <div className="flex flex-col gap-1.5">
+                    <div className="text-[9px] text-slate-400 font-semibold uppercase tracking-wide">Currents</div>
+                    <MobileProGate isPro={isPro} label="Ocean current overlay is available on the Pro plan.">
+                      <button onClick={() => setShowCurrents(v => !v)}
+                        className={`text-[11px] font-semibold px-3 py-2 rounded-lg border flex items-center justify-center gap-1.5 transition-colors ${showCurrents ? "bg-sky-600 text-white border-sky-600" : "bg-white text-slate-600 border-slate-300"}`}>
+                        &#x1F30A; {currentsLoading ? "Loading…" : showCurrents ? "Currents on" : "Currents overlay"}
+                      </button>
+                    </MobileProGate>
+                  </div>
+                )}
+
+                {/* ── Altimetry panel ──────────────────────────────────────── */}
+                {mobilePanel === "altimetry" && (
+                  <div className="flex flex-col gap-1.5">
+                    <div className="text-[9px] text-slate-400 font-semibold uppercase tracking-wide">Altimetry</div>
+                    <MobileProGate isPro={isPro} label="Sea level anomaly overlay is available on the Pro plan.">
+                      <button onClick={() => setShowAltimetry(v => !v)}
+                        className={`text-[11px] font-semibold px-3 py-2 rounded-lg border flex items-center justify-center gap-1.5 transition-colors ${showAltimetry ? "bg-violet-600 text-white border-violet-600" : "bg-white text-slate-600 border-slate-300"}`}>
+                        &#x1F30D; {altimetryLoading ? "Loading…" : showAltimetry ? "SLA on" : "Sea level anomaly"}
+                      </button>
+                    </MobileProGate>
+                  </div>
+                )}
+
+                                {/* ── Tools panel ────────────────────────────────────── */}
                 {mobilePanel === "tools" && (
                   <>
                     <div className="text-[9px] text-slate-400 font-semibold uppercase tracking-wide">Fish &amp; Overlays</div>
@@ -1903,6 +2063,8 @@ export default function SSTHeatmapLeaflet(props) {
                   {activeDataLayer==="chlorophyll"&&hoverInfo.chl!=null&&<div className="text-green-600 font-semibold">{hoverInfo.chl.toFixed(3)} mg/m3 <span className="text-slate-400 font-normal">({hoverInfo.color_class})</span></div>}
                   {activeDataLayer==="seacolor"&&hoverInfo.kd490!=null&&<div className="text-teal-600 font-semibold">{hoverInfo.kd490.toFixed(4)} m-1</div>}
                   {(activeDataLayer==="windmap"||showWindOverlay)&&hoverInfo.windSpeed_kt!=null&&<div className="text-sky-600 font-semibold">{Math.round(hoverInfo.windSpeed_kt)} kt{hoverInfo.windDir_deg!=null ? ` · ${bearingLabel(hoverInfo.windDir_deg)}` : ""}</div>}
+                  {showCurrents&&hoverInfo.currSpeed_ms!=null&&<div className="text-cyan-700 font-semibold">{hoverInfo.currSpeed_ms.toFixed(2)} m/s current{hoverInfo.currDir_deg!=null ? ` · ${bearingLabel(hoverInfo.currDir_deg)}` : ""}</div>}
+                  {showAltimetry&&hoverInfo.sla_m!=null&&<div className="text-violet-600 font-semibold">SLA {hoverInfo.sla_m>=0?"+":""}{hoverInfo.sla_m.toFixed(3)} m</div>}
                   {hoverInfo.depth_ft!=null&&<div className="text-blue-600 font-medium">{Math.round(hoverInfo.depth_ft)} ft / {Math.round(hoverInfo.depth_ft/6)} fth</div>}
                   {hoverInfo.dist!=null&&<div className="text-slate-600">{hoverInfo.dist.toFixed(1)} nm {Math.round(hoverInfo.bearing)}° {bearingLabel(hoverInfo.bearing)}</div>}
                   {hoverInfo.sst==null&&hoverInfo.depth_ft==null&&hoverInfo.chl==null&&hoverInfo.kd490==null&&hoverInfo.windSpeed_kt==null&&hoverInfo.dist==null&&<div className="text-slate-400">No data</div>}

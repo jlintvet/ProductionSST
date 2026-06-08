@@ -157,6 +157,7 @@ function ToolBtn({ active, onClick, color = "sky", children }) {
     amber:  "bg-amber-700 text-white border-amber-700",
     cyan:   "bg-cyan-600 text-white border-cyan-600",
     blue:   "bg-blue-700 text-white border-blue-700",
+    violet: "bg-violet-600 text-white border-violet-600",
   };
   return (
     <button
@@ -279,6 +280,8 @@ export default function MapControlPanel({
   hotspotLoading,
   selectedFishSpecies, setSelectedFishSpecies,
   showWindOverlay, setShowWindOverlay,
+  currentsLoading, showCurrents, setShowCurrents,
+  altimetryLoading, showAltimetry, setShowAltimetry,
   // overlays
   showBathyLayer, setShowBathyLayer,
   jsonContoursLoading,
@@ -553,6 +556,16 @@ export default function MapControlPanel({
               </ToolBtn>
             </ProGate>
           )}
+          <ProGate isPro={isPro} label="Ocean current overlay is available on the Pro plan.">
+            <ToolBtn active={showCurrents} color="cyan" onClick={() => setShowCurrents(v => !v)}>
+              &#x1F30A; {currentsLoading ? "Loading…" : showCurrents ? "Currents on" : "Currents overlay"}
+            </ToolBtn>
+          </ProGate>
+          <ProGate isPro={isPro} label="Sea level anomaly (altimetry) is available on the Pro plan.">
+            <ToolBtn active={showAltimetry} color="violet" onClick={() => setShowAltimetry(v => !v)}>
+              &#x1F30D; {altimetryLoading ? "Loading…" : showAltimetry ? "SLA on" : "Sea level anomaly"}
+            </ToolBtn>
+          </ProGate>
         </div>
       )}
 

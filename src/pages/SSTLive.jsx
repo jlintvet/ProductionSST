@@ -47,6 +47,8 @@ const HOTSPOTS_BASE      = "https://raw.githubusercontent.com/jlintvet/SSTv2/mai
 const VIIRS_CDN_BASE     = "https://raw.githubusercontent.com/jlintvet/SSTv2/main/DailySSTData/VIIRS/Bundled";
 const VIIRS_COMPOSITE_URL= `${VIIRS_CDN_BASE}/viirs_composite.json`;
 const WIND_DATA_URL      = "https://raw.githubusercontent.com/jlintvet/SSTv2/main/WindData/wind_latest.json";
+const CURRENTS_URL       = "https://raw.githubusercontent.com/jlintvet/SSTv2/main/DailySST/Currents/currents_latest.json";
+const ALTIMETRY_URL      = "https://raw.githubusercontent.com/jlintvet/SSTv2/main/DailySST/Altimetry/altimetry_latest_grid.json";
 const _viirsCache = new Map();
 
 // ── VIIRS bundle parsing ───────────────────────────────────────────────────────
@@ -331,6 +333,12 @@ function SSTPageBody() {
   const [windHourIndex,  setWindHourIndex]  = useState(0);
   const [showWindOverlay,setShowWindOverlay]= useState(false);
   const [windPlaying,    setWindPlaying]    = useState(false);
+  const [currentsData,   setCurrentsData]   = useState(null);
+  const [currentsLoading,setCurrentsLoading]= useState(false);
+  const [showCurrents,   setShowCurrents]   = useState(false);
+  const [altimetryData,  setAltimetryData]  = useState(null);
+  const [altimetryLoading,setAltimetryLoading]=useState(false);
+  const [showAltimetry,  setShowAltimetry]  = useState(false);
   const [hotspotData,    setHotspotData]    = useState(null);
   const [hotspotLoading, setHotspotLoading] = useState(false);
   const [selectedFishSpecies,setSelectedFishSpecies] = useState("yellowfin");
@@ -376,6 +384,29 @@ function SSTPageBody() {
       .catch(e => console.error("[WIND] fetch failed:", e))
       .finally(() => setWindLoading(false));
   }, [windActive]);
+
+  const currentsActive  = showCurrents;
+  useEffect(() => {
+    if (!currentsActive || currentsData || currentsLoading) return;
+    setCurrentsLoading(true);
+    fetch(CURRENTS_URL)
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then(d => setCurrentsData(d))
+      .catch(e => console.error("[CURRENTS] fetch failed:", e))
+      .finally(() => setCurrentsLoading(false));
+  }, [currentsActive]);
+
+  const altimetryActive = showAltimetry;
+  useEffect(() => {
+    if (!altimetryActive || altimetryData || altimetryLoading) return;
+    setAltimetryLoading(true);
+    fetch(ALTIMETRY_URL)
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then(d => setAltimetryData(d))
+      .catch(e => console.error("[ALTIMETRY] fetch failed:", e))
+      .finally(() => setAltimetryLoading(false));
+  }, [altimetryActive]);
+
 
   useEffect(()=>{
     console.log("[FISH] SSTLive effect — showHotspots:", showHotspots, "hasData:", !!hotspotData, "loading:", hotspotLoading);
@@ -525,6 +556,10 @@ function SSTPageBody() {
               windHourIndex={windHourIndex} setWindHourIndex={setWindHourIndex}
               showWindOverlay={showWindOverlay} setShowWindOverlay={setShowWindOverlay}
               windPlaying={windPlaying} setWindPlaying={setWindPlaying}
+              currentsData={currentsData} currentsLoading={currentsLoading}
+              showCurrents={showCurrents} setShowCurrents={setShowCurrents}
+              altimetryData={altimetryData} altimetryLoading={altimetryLoading}
+              showAltimetry={showAltimetry} setShowAltimetry={setShowAltimetry}
               sstRange={sstRange} onSstRangeChange={setSstRange} userId={userId}
               wreckRemovedKeys={wreckRemovedKeys}
               hotspotData={hotspotData} hotspotLoading={hotspotLoading}
