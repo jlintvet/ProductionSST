@@ -281,7 +281,6 @@ export default function MapControlPanel({
   selectedFishSpecies, setSelectedFishSpecies,
   showWindOverlay, setShowWindOverlay,
   currentsLoading, showCurrents, setShowCurrents,
-  altimetryLoading, showAltimetry, setShowAltimetry,
   // overlays
   showBathyLayer, setShowBathyLayer,
   jsonContoursLoading,
@@ -313,7 +312,8 @@ export default function MapControlPanel({
   const isSSTGroup  = isSST || isComposite;
   const isCHL       = activeDataLayer === "chlorophyll";
   const isSC        = activeDataLayer === "seacolor";
-  const showGain    = !isWindMap;
+  const isAlt       = activeDataLayer === "altimetry";
+  const showGain    = !isWindMap && !isAlt;
 
   const gainLabel = isSSTGroup ? "Temp gain" : isCHL ? "CHL gain" : isSC ? "Kd490 gain" : "Gain";
 
@@ -478,6 +478,12 @@ export default function MapControlPanel({
             />
           )}
 
+          <ProGate isPro={isPro} label="Sea level anomaly (altimetry) is available on the Pro plan.">
+            <LayerBtn active={isAlt} color="violet" onClick={() => setActiveDataLayer("altimetry")}>
+              🌊 Altimetry
+            </LayerBtn>
+          </ProGate>
+
           <LayerBtn active={isWindMap} color="sky" onClick={() => setActiveDataLayer("windmap")}>
             <Wind className="w-3 h-3" />{windLoading ? "Loading…" : "Wind map"}
           </LayerBtn>
@@ -561,11 +567,6 @@ export default function MapControlPanel({
               &#x1F30A; {currentsLoading ? "Loading…" : showCurrents ? "Currents on" : "Currents overlay"}
             </ToolBtn>
           </ProGate>
-          <ProGate isPro={isPro} label="Sea level anomaly (altimetry) is available on the Pro plan.">
-            <ToolBtn active={showAltimetry} color="violet" onClick={() => setShowAltimetry(v => !v)}>
-              &#x1F30D; {altimetryLoading ? "Loading…" : showAltimetry ? "SLA on" : "Sea level anomaly"}
-            </ToolBtn>
-          </ProGate>
         </div>
       )}
 
@@ -588,4 +589,4 @@ export default function MapControlPanel({
 
     </div>
   );
-}
+}                                                                 

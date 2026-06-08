@@ -422,7 +422,7 @@ export default function SSTHeatmapLeaflet(props) {
     BATHY_CONTOURS_URL, WRECKS_URL,
     isPro,
     currentsData, currentsLoading, showCurrents, setShowCurrents,
-    altimetryData, altimetryLoading, showAltimetry, setShowAltimetry,
+    altimetryData,
   } = props;
 
   const { latSet, lonSet, grid } = data;
@@ -449,7 +449,6 @@ export default function SSTHeatmapLeaflet(props) {
   const velocityLayerRef    = useRef(null);
   const windRasterOverlayRef= useRef(null);
   const currentsLayerRef    = useRef(null);
-  const altimetryOverlayRef = useRef(null);
   const blobUrlsRef         = useRef([]);
 
   const selectedLocationRef = useRef(selectedLocation);
@@ -470,8 +469,6 @@ export default function SSTHeatmapLeaflet(props) {
   const showWindOverlayRef = useRef(false); useEffect(() => { showWindOverlayRef.current = showWindOverlay; }, [showWindOverlay]);
   const currentsDataRef  = useRef(currentsData);  useEffect(() => { currentsDataRef.current = currentsData; }, [currentsData]);
   const showCurrentsRef  = useRef(false);          useEffect(() => { showCurrentsRef.current = showCurrents; }, [showCurrents]);
-  const altimetryDataRef = useRef(altimetryData);  useEffect(() => { altimetryDataRef.current = altimetryData; }, [altimetryData]);
-  const showAltimetryRef = useRef(false);          useEffect(() => { showAltimetryRef.current = showAltimetry; }, [showAltimetry]);
   const compositeDataRef=useRef(compositeData);useEffect(()=>{compositeDataRef.current=compositeData;},[compositeData]);
   const userInteractedRef = useRef(false);
 
@@ -974,6 +971,22 @@ export default function SSTHeatmapLeaflet(props) {
       lonSet2=[...new Set(day.grid.map(d=>d.lon))].sort((a,b)=>a-b);
       overlayGrid={};day.grid.forEach(d=>{overlayGrid[`${d.lat}_${d.lon}`]=d.kd490;});
       min2=day.stats.min;max2=day.stats.max;colorFn=kd490Color;
+    } else if (activeDataLayer==="altimetry"&&altimetryData?.lats?.length) {
+      const { lats, lons, sla } = altimetryData;
+      if (!sla) return;
+      const rawLats = lats.map(v => Math.round(v * 1e5) / 1e5);
+      const rawLons = lons.map(v => Math.round(v * 1e5) / 1e5);
+      overlayGrid = {};
+      for (let i = 0; i < rawLats.length; i++) {
+        const row = sla[i]; if (!row) continue;
+        for (let j = 0; j < rawLons.length; j++) {
+          const v = row[j];
+          if (v != null && Number.isFinite(v)) overlayGrid[`${rawLats[i]}_${rawLons[j]}`] = v;
+        }
+      }
+      latSet2 = [...rawLats].sort((a, b) => b - a);
+      lonSet2 = [...rawLons].sort((a, b) => a - b);
+      min2 = -0.4; max2 = 0.4; colorFn = slaColor;
     } else { return; }
     if (!latSet2.length) return;
     let cancelled = false;
@@ -994,7 +1007,7 @@ export default function SSTHeatmapLeaflet(props) {
       overlay.addTo(map); overlayLayerRef.current = overlay;
     });
     return () => { cancelled = true; };
-  }, [mapReady, activeDataLayer, chlData, chlDateIndex, seaColorData, seaColorDateIndex, compositeData, waterMaskVersion, repaintTrigger, sstRange?.min, sstRange?.max]);
+  }, [mapReady, activeDataLayer, chlData, chlDateIndex, seaColorData, seaColorDateIndex, compositeData, altimetryData, waterMaskVersion, repaintTrigger, sstRange?.min, sstRange?.max]);
 
   // ── Velocity layer ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1098,48 +1111,6 @@ export default function SSTHeatmapLeaflet(props) {
       });
     }
   }, [mapReady, windActive, windData, windHourIndex, isWindMap, waterMaskVersion]);
-
-  // ── Altimetry (SLA) color overlay ─────────────────────────────────────────
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!mapReady || !map) return;
-    if (altimetryOverlayRef.current) { map.removeLayer(altimetryOverlayRef.current); altimetryOverlayRef.current = null; }
-    if (!showAltimetry || !altimetryData?.lats?.length) return;
-    const { lats, lons, sla } = altimetryData;
-    if (!sla) return;
-    // Use original indices to build the grid, then sort lats N→S for gridToDataURL
-    const rawLats = lats.map(v => Math.round(v * 1e5) / 1e5);
-    const rawLons = lons.map(v => Math.round(v * 1e5) / 1e5);
-    const slaGrid = {};
-    for (let i = 0; i < rawLats.length; i++) {
-      const row = sla[i]; if (!row) continue;
-      for (let j = 0; j < rawLons.length; j++) {
-        const v = row[j];
-        if (v != null && Number.isFinite(v)) slaGrid[`${rawLats[i]}_${rawLons[j]}`] = v;
-      }
-    }
-    // gridToDataURL expects latSet sorted descending (N→S)
-    const latSet = [...rawLats].sort((a, b) => b - a);
-    const lonSet = [...rawLons].sort((a, b) => a - b);
-    // slaColor takes a single value (±0.4 m range), wrap to match gridToDataURL signature
-    const slaColorFn = (val) => slaColor(val);
-    Promise.resolve(
-      gridToDataURL(latSet, lonSet, slaGrid, -0.4, 0.4, slaColorFn, waterMaskRef.current)
-    ).then(result => {
-      if (!result || !mapRef.current) return;
-      if (altimetryOverlayRef.current) { mapRef.current.removeLayer(altimetryOverlayRef.current); altimetryOverlayRef.current = null; }
-      const bounds = L.latLngBounds(
-        [Math.min(...latSet), Math.min(...lonSet)],
-        [Math.max(...latSet), Math.max(...lonSet)]
-      );
-      const raster = L.imageOverlay(result.dataURL, bounds, { opacity: 0.45, zIndex: 300 });
-      raster.addTo(mapRef.current);
-      altimetryOverlayRef.current = raster;
-    });
-    return () => {
-      if (altimetryOverlayRef.current) { map.removeLayer(altimetryOverlayRef.current); altimetryOverlayRef.current = null; }
-    };
-  }, [mapReady, showAltimetry, altimetryData, waterMaskVersion]);
 
   // ── Isotherm layer ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1574,7 +1545,6 @@ export default function SSTHeatmapLeaflet(props) {
             selectedFishSpecies={selectedFishSpecies} setSelectedFishSpecies={setSelectedFishSpecies}
             showWindOverlay={showWindOverlay} setShowWindOverlay={setShowWindOverlay}
             currentsLoading={currentsLoading} showCurrents={showCurrents} setShowCurrents={setShowCurrents}
-            altimetryLoading={altimetryLoading} showAltimetry={showAltimetry} setShowAltimetry={setShowAltimetry}
             showBathyLayer={showBathyLayer} setShowBathyLayer={setShowBathyLayer} jsonContoursLoading={jsonContoursLoading}
             showWrecks={showWrecks} setShowWrecks={setShowWrecks} wrecksLoading={wrecksLoading}
             selectedLocation={selectedLocation}
@@ -2251,3 +2221,4 @@ export default function SSTHeatmapLeaflet(props) {
     </div>
   );
 }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     

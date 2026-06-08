@@ -167,6 +167,7 @@ function GradientLegend({ gradient, label, unit, dataMin, dataMax, rangeMin, ran
 }
 const CHL_GRADIENT  = "linear-gradient(to right, rgb(10,40,130), rgb(0,100,180), rgb(0,170,100), rgb(120,200,0), rgb(200,160,0))";
 const KD_GRADIENT   = "linear-gradient(to right, rgb(10,60,160), rgb(0,140,170), rgb(0,160,80), rgb(100,150,20), rgb(150,100,0))";
+const SLA_GRADIENT  = "linear-gradient(to right, rgb(0,50,200), rgb(80,140,255), rgb(180,220,255), rgb(255,255,255), rgb(255,210,180), rgb(255,120,80), rgb(200,0,0))";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // InlineLogin — self-contained, zero external deps, shown when no session
@@ -338,7 +339,6 @@ function SSTPageBody() {
   const [showCurrents,   setShowCurrents]   = useState(false);
   const [altimetryData,  setAltimetryData]  = useState(null);
   const [altimetryLoading,setAltimetryLoading]=useState(false);
-  const [showAltimetry,  setShowAltimetry]  = useState(false);
   const [hotspotData,    setHotspotData]    = useState(null);
   const [hotspotLoading, setHotspotLoading] = useState(false);
   const [selectedFishSpecies,setSelectedFishSpecies] = useState("yellowfin");
@@ -396,7 +396,7 @@ function SSTPageBody() {
       .finally(() => setCurrentsLoading(false));
   }, [currentsActive]);
 
-  const altimetryActive = showAltimetry;
+  const altimetryActive = activeDataLayer === "altimetry";
   useEffect(() => {
     if (!altimetryActive || altimetryData || altimetryLoading) return;
     setAltimetryLoading(true);
@@ -558,8 +558,7 @@ function SSTPageBody() {
               windPlaying={windPlaying} setWindPlaying={setWindPlaying}
               currentsData={currentsData} currentsLoading={currentsLoading}
               showCurrents={showCurrents} setShowCurrents={setShowCurrents}
-              altimetryData={altimetryData} altimetryLoading={altimetryLoading}
-              showAltimetry={showAltimetry} setShowAltimetry={setShowAltimetry}
+              altimetryData={altimetryData}
               sstRange={sstRange} onSstRangeChange={setSstRange} userId={userId}
               wreckRemovedKeys={wreckRemovedKeys}
               hotspotData={hotspotData} hotspotLoading={hotspotLoading}
@@ -606,6 +605,10 @@ function SSTPageBody() {
                   rangeMin={sstRange?.min} rangeMax={sstRange?.max}
                   hoverVal={legendHoverSst}
                   onClick={() => rangeControlOpenRef.current?.()}/>
+              : activeDataLayer === "altimetry"
+              ? <GradientLegend gradient={SLA_GRADIENT} label="Sea level" unit=" m"
+                  dataMin={-0.4} dataMax={0.4}
+                  hoverVal={legendHoverSst}/>
               : <SSTLegend sstMin={sstMin} sstMax={sstMax} hoverSst={legendHoverSst} rangeMin={sstRange?.min} rangeMax={sstRange?.max} onClick={() => rangeControlOpenRef.current?.()}/>
             }
           </div>
@@ -649,15 +652,4 @@ export default function SSTLive() {
 
     return () => {
       cancelled = true;
-      try { sub?.unsubscribe?.(); } catch (_) {}
-    };
-  }, []);
-
-  if (!authed) return <InlineLogin />;
-
-  return (
-    <AppShell region="mid_atlantic" onUpgrade={() => alert("Upgrade coming soon!")}>
-      <SSTPageBody />
-    </AppShell>
-  );
-}
+      try { sub
