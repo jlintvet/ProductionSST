@@ -28,3 +28,10 @@ dist-ssr
 *.sw?
 
 .env*.zip
+
+# Claude editor temp files
+*.tmp.*
+_autopush.bat
+_setup_autopush.ps1
+_push_now.bat
+_push_fix.bat

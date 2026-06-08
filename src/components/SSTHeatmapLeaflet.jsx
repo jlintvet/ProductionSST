@@ -2282,4 +2282,3 @@ export default function SSTHeatmapLeaflet(props) {
     </div>
   );
 }
-       
