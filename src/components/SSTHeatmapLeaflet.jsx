@@ -1028,6 +1028,7 @@ export default function SSTHeatmapLeaflet(props) {
 
   // ── Currents velocity layer ─────────────────────────────────────────────────
   useEffect(() => {
+    const map = mapRef.current;
     if (!mapReady || !map) return;
     if (currentsLayerRef.current) { map.removeLayer(currentsLayerRef.current); currentsLayerRef.current = null; }
     if (!showCurrents || !currentsData?.hours?.length) return;
@@ -1100,6 +1101,7 @@ export default function SSTHeatmapLeaflet(props) {
 
   // ── Altimetry (SLA) color overlay ─────────────────────────────────────────
   useEffect(() => {
+    const map = mapRef.current;
     if (!mapReady || !map) return;
     if (altimetryOverlayRef.current) { map.removeLayer(altimetryOverlayRef.current); altimetryOverlayRef.current = null; }
     if (!showAltimetry || !altimetryData?.lats?.length) return;
