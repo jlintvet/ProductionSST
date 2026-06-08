@@ -1106,13 +1106,10 @@ export default function SSTHeatmapLeaflet(props) {
     // Color + weight per level
     const levelStyle = (v) => {
       const a = Math.abs(v);
-      if (a < 0.025) return { color: "#111", weight: 2.5 }; // zero line — dark, bold
-      if (v < -0.2)  return { color: "#0018b0", weight: 2.0 };
-      if (v < -0.1)  return { color: "#1c60e0", weight: 1.8 };
-      if (v < 0)     return { color: "#5090f0", weight: 1.4 };
-      if (v > 0.2)   return { color: "#a00000", weight: 2.0 };
-      if (v > 0.1)   return { color: "#d83010", weight: 1.8 };
-      return { color: "#e87040", weight: 1.4 };
+      if (a < 0.025) return { weight: 2.5 };
+      if (a >= 0.2)  return { weight: 2.0 };
+      if (a >= 0.1)  return { weight: 1.8 };
+      return { weight: 1.4 };
     };
     try {
       const { field, rows, cols } = buildField(latSet2, lonSet2, overlayGrid);
@@ -1120,12 +1117,12 @@ export default function SSTHeatmapLeaflet(props) {
       for (const level of levels) {
         const lines = marchingSquares(latSet2, lonSet2, field, rows, cols, level);
         if (!lines.length) continue;
-        const { color, weight } = levelStyle(level);
+        const { weight } = levelStyle(level);
         const isZero = Math.abs(level) < 0.025;
         lines.forEach(seg => {
           const latlngs = seg.map(([lon, lat]) => [lat, lon]);
-          if (isZero) L.polyline(latlngs, { color: "rgba(255,255,255,0.55)", weight: weight + 3, interactive: false }).addTo(contourGroup);
-          L.polyline(latlngs, { color, weight, opacity: 0.9, interactive: false }).addTo(contourGroup);
+          L.polyline(latlngs, { color: "rgba(0,0,0,0.35)", weight: weight + 2, interactive: false }).addTo(contourGroup);
+          L.polyline(latlngs, { color: "#ffffff", weight: isZero ? weight + 1 : weight, opacity: 0.92, interactive: false }).addTo(contourGroup);
         });
       }
       contourGroup.addTo(map);
@@ -2237,4 +2234,50 @@ export default function SSTHeatmapLeaflet(props) {
               <div className="flex-1 overflow-y-auto p-2">
                 <SavedLocations locations={savedLocations} onRefresh={fetchSavedLocations}
                   onClearMarkers={id => clearMarkersRef.current?.(id)}
-                  onSelectLocation={(idx, loc) => { if (!loc) { setHighlightedLocation(null); return; }
+                  onSelectLocation={(idx, loc) => { if (!loc) { setHighlightedLocation(null); return; } flyToRef.current?.(loc.lat, loc.lon); setHighlightedLocation(loc); }}
+                  highlightedId={highlightedLocation?.id} onShare={onShare} isPro={isPro}/>
+              </div>
+            </div>
+          ):(
+            <button onClick={()=>setShowSavedPanel(true)} className="hidden sm:flex absolute left-2 bg-white border border-slate-200 rounded-full shadow-lg px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 items-center gap-1.5" style={{bottom:sliderHeight+8,zIndex:900}}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+              <span>{savedLocations?.length??0} saved</span>
+            </button>
+          )}
+
+          {windActive&&windData?.hours?.length>0&&isDesktop&&(
+            <WindTimeSlider windData={windData} windHourIndex={windHourIndex} setWindHourIndex={setWindHourIndex} isPlaying={windPlaying} setIsPlaying={setWindPlaying} isWindMap={isWindMap}/>
+          )}
+
+          {isWindMap && (
+            <div className="sm:hidden absolute left-0 right-0 px-2" style={{ bottom: 64, zIndex: 600, pointerEvents: "none" }}>
+              <WindLegend isWindMap={true} />
+            </div>
+          )}
+
+          <div className="sm:hidden absolute left-0 right-0 px-2" style={{ bottom: 64, zIndex: 600, pointerEvents: "auto" }}>
+            {isWindMap
+              ? null
+              : activeDataLayer === "chlorophyll"
+              ? <MobileGradientBar
+                  gradient={CHL_GRADIENT} label="Chlorophyll" unit=" µg/L" logScale
+                  lo={sstRange?.min ?? (chlData?.days?.[chlDateIndex]?.stats?.min ?? 0.01)}
+                  hi={sstRange?.max ?? (chlData?.days?.[chlDateIndex]?.stats?.max ?? 10)}
+                  hoverVal={hoverInfo?.chl}
+                  onBarClick={() => rangeControlOpenRef?.current?.()}/>
+              : activeDataLayer === "seacolor"
+              ? <MobileGradientBar
+                  gradient={KD_GRADIENT} label="Kd490" unit=" m⁻¹"
+                  lo={sstRange?.min ?? (seaColorData?.days?.[seaColorDateIndex]?.stats?.min ?? 0.01)}
+                  hi={sstRange?.max ?? (seaColorData?.days?.[seaColorDateIndex]?.stats?.max ?? 0.50)}
+                  hoverVal={hoverInfo?.kd490}
+                  onBarClick={() => rangeControlOpenRef?.current?.()}/>
+              : <SSTLegend sstMin={sstMin} sstMax={sstMax} hoverSst={legendHoverSst} rangeMin={sstRange?.min} rangeMax={sstRange?.max} onClick={() => rangeControlOpenRef?.current?.()}/>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+                                                                                                                                                                                                                                                                             
